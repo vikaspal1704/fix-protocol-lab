@@ -1,0 +1,22 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploy: Render dashboard -> New -> Blueprint -> select this repo (tracks main).
+# Then add your custom domain under the service's Settings -> Custom Domains.
+services:
+  - type: web
+    name: fix-protocol-lab
+    runtime: node
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HEARTBEAT_INTERVAL_SEC
+        value: "10"
+      - key: MAX_SANDBOXES
+        value: "50"
+      - key: SANDBOX_IDLE_TIMEOUT_SEC
+        value: "600"
