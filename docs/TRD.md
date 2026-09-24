@@ -51,6 +51,8 @@ fix-protocol-lab/
 │   │   │       ├── fix44/       # profile.ts, dictionary.ts (implemented)
 │   │   │       └── planned.ts   # FIX.4.2, FIX.4.3, FIX.5.0SP2 metadata (status: planned)
 │   │   └── test/
+│   ├── fix-orders/          # per-version OrderDialect (fix44.ts, …); isomorphic, shared by server + web
+│   │   └── src/
 │   └── fix-session/
 │       ├── src/
 │       │   ├── index.ts
@@ -67,7 +69,6 @@ fix-protocol-lab/
 │   │   │   ├── config.ts
 │   │   │   ├── sandbox.ts       # one initiator+acceptor pair per WS client
 │   │   │   ├── exchange.ts      # simulated exchange (ARCHITECTURE §6), version-neutral
-│   │   │   ├── dialects/        # per-version order message builders/parsers (fix44.ts, …)
 │   │   │   ├── autoplay.ts      # scripted order generator
 │   │   │   └── bridge.ts        # FIX events -> WS events (API_CONTRACT §5)
 │   │   └── test/
@@ -95,8 +96,9 @@ fix-protocol-lab/
 |---------|---------------|--------------------|
 | `fix-core` | nothing (runtime) | `node:*`, React, `ws` |
 | `fix-session` | `fix-core`, `node:net`, `node:events` | React, `ws`, server code |
-| `apps/server` | `fix-core`, `fix-session`, `ws` | React |
-| `apps/web` | `fix-core` (for live preview and dictionary), React stack | `fix-session`, `node:*` |
+| `fix-orders` | `fix-core` | `node:*`, React, `ws` |
+| `apps/server` | `fix-core`, `fix-orders`, `fix-session`, `ws` | React |
+| `apps/web` | `fix-core` + `fix-orders` (live preview and dictionary), React stack | `fix-session`, `node:*` |
 
 The browser never opens a FIX session. It only talks to the server over WebSocket.
 

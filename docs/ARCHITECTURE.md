@@ -293,11 +293,11 @@ FIX Protocol Lab aims to show **every** FIX version working live. The design mak
 | BeginString, ApplVerID | `FixVersionProfile` | `FIX.4.2` / `FIX.4.4`; FIX 5.x sends `8=FIXT.1.1` plus `1128`/`1137` ApplVerID |
 | Tags, enums, message types | `FixDictionary` per version, built with `defineDictionary(base, overrides)`, so 4.3 extends 4.2 and 4.4 extends 4.3 | 4.2 has ExecTransType (20); 4.3+ drop it. ExecType fills are `1`/`2` in 4.2 and `F` in 4.3+ |
 | Session details | `profile.session` (extra Logon fields, admin types) | FIXT Logon adds DefaultApplVerID (1137) |
-| Order message shapes | `apps/server/src/dialects/<id>.ts` implementing `OrderDialect` | How an ExecutionReport for a fill is expressed |
+| Order message shapes | `packages/fix-orders/src/<id>.ts` implementing `OrderDialect` (isomorphic: the server sends with it and the UI previews with it) | How an ExecutionReport for a fill is expressed |
 
 What does **not** vary, and stays version-neutral: codec byte rules (9/10), framing, sequence numbers, heartbeats, TestRequest, resend and gap fill, fault injection, the WS bridge and the UI.
 
-### `OrderDialect` (server)
+### `OrderDialect` (`@fixlab/fix-orders`)
 
 ```ts
 interface OrderDialect {
@@ -315,7 +315,7 @@ The exchange simulator emits **version-neutral** `ExecEvent`s (`new`, `fill`, `c
 ### Adding a version (checklist)
 
 1. `packages/fix-core/src/versions/<id>/`: `profile.ts` and `dictionary.ts` (derived from the nearest implemented version). Flip `status` from `planned` to `implemented`.
-2. `apps/server/src/dialects/<id>.ts`, plus registration in the dialect map.
+2. `packages/fix-orders/src/<id>.ts`, plus registration in the dialect map (`packages/fix-orders/src/index.ts`).
 3. Golden vectors for that version in API_CONTRACT (a new §1.3 subsection), generated and verified byte for byte.
 4. Tests: `codec round-trips <id> golden vectors`, `session logs on and recovers a gap in <id>`, `exchange flow in <id> produces valid execution reports`.
 5. README and version picker copy (one-line `summary`).

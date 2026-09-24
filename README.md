@@ -6,7 +6,7 @@ Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech).
 
 | | |
 |---|---|
-| **Status** | Docs-first — implementation pending |
+| **Status** | Implemented (M1 + M2) — 98 tests incl. Playwright e2e; see [CI](.github/workflows/ci.yml). Live demo: deploy pending |
 | **Protocol** | FIX tag=value over TCP. v1 ships **FIX 4.4**; every version is a plug-in profile, and 4.2, 4.3 and 5.0 SP2 (over FIXT.1.1) are on the roadmap |
 | **Stack** | Node.js 22 + TypeScript (engine, server) · React 19 + TypeScript strict + Redux Toolkit/RTK Query + Tailwind v4 (UI) |
 | **Live demo** | `https://<your-domain>` (planned; see [Deploy](#deploy)) |
@@ -66,20 +66,40 @@ Production engines like QuickFIX/J are excellent and complete, but they are text
 
 ---
 
-## How to run (once implemented)
+## How to run
 
 ```bash
 git clone https://github.com/vikaspal1704/fix-protocol-lab.git
 cd fix-protocol-lab
 npm install            # npm workspaces
 npm test               # vitest across all packages
-npm run dev            # server on :8080 + Vite dev server on :5173
-npm run build && npm start   # production: one Node process serves UI + WebSocket
+npm run dev            # server on :8080 + Vite dev server on :5173 (open :5173)
+npm run build && npm start   # production: one Node process serves UI + WebSocket on :8080
+npm run e2e            # Playwright end-to-end against the production build
 ```
+
+## Project layout
+
+```
+packages/fix-core      tag=value codec, framer, version registry, per-version dictionaries (isomorphic)
+packages/fix-orders    per-version order dialects (NewOrderSingle, ExecutionReport, …), shared by server and UI
+packages/fix-session   session engine: logon, heartbeats, TestRequest, sequence rules, resend/gap fill, faults, TCP
+apps/server            one sandbox per visitor (BUYSIDE + EXCH over loopback TCP), exchange simulator, WebSocket bridge
+apps/web               React UI: live sequence diagram, order ticket + encoded preview, inspector, tag reference
+docs/                  PRD, TRD, API contract, architecture, acceptance criteria, test plan, session-layer write-up
+```
+
+The session layer is explained step by step in [`docs/SESSION_LAYER.md`](docs/SESSION_LAYER.md).
 
 ## Deploy
 
-One Node web service serves the built UI, `GET /health` and `WS /ws`. The FIX TCP sessions run on loopback inside that process and are never exposed publicly. The target is a Render web service behind a **custom domain**; see [`docs/TRD.md`](docs/TRD.md) §9.
+One Node web service serves the built UI, `GET /health` and `WS /ws`. The FIX TCP sessions run on loopback inside that process and are never exposed publicly.
+
+1. Render dashboard → **New → Blueprint** → pick this repo → **Apply** ([`render.yaml`](render.yaml); tracks `main`).
+2. Add your domain under the service's **Settings → Custom Domains** and point a CNAME at it; Render issues HTTPS.
+3. Share links like `https://<your-domain>/?scenario=gap-recovery` to open straight into a demo.
+
+See [`docs/TRD.md`](docs/TRD.md) §9.
 
 ## Roadmap
 
