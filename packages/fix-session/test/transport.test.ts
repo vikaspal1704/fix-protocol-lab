@@ -23,7 +23,7 @@ let acceptor: AcceptorHandle | null = null;
 const sessions: FixSession[] = [];
 
 afterEach(async () => {
-  for (const s of sessions.splice(0)) if (s.state !== "DISCONNECTED") s["disconnect"]("test done");
+  for (const s of sessions.splice(0)) if (s.state !== "DISCONNECTED") s.close("test done");
   await acceptor?.close();
   acceptor = null;
 });
@@ -78,7 +78,7 @@ describe("tcp transport", () => {
     buy.logon();
     await until(() => exch.state === "ACTIVE");
 
-    buy["disconnect"]("test closes socket");
+    buy.close("test closes socket");
 
     await until(() => exch.state === "DISCONNECTED");
     expect(buy.state).toBe("DISCONNECTED");

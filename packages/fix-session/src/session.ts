@@ -164,6 +164,11 @@ export class FixSession extends Emitter<SessionEvents> {
     );
   }
 
+  /** Drop the connection immediately, without a Logout handshake. */
+  close(reason = "closed"): void {
+    this.disconnect(reason);
+  }
+
   /** Send an application message; header and trailer are filled in. Returns its MsgSeqNum. */
   send(msgType: string, fields: readonly FixField[]): number {
     if (this._state !== "ACTIVE" && this._state !== "RESENDING") {
