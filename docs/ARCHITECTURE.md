@@ -38,10 +38,10 @@ flowchart LR
 
 | Component | Responsibility |
 |-----------|----------------|
-| `fix-core` | Bytes ↔ `FixMessage`, BodyLength/CheckSum, framing, dictionary. No I/O. |
+| `fix-core` | Bytes ↔ `FixMessage`, BodyLength/CheckSum, framing, **version registry** and per-version dictionaries. No I/O. |
 | `fix-session` | Session state machine, sequence numbers, heartbeats, TestRequest, resend/gap fill, faults. Transport-agnostic core + TCP adapter. |
 | Sandbox | Creates the acceptor listener on `127.0.0.1:0`, connects the initiator, wires both sessions' `wire` events to the bridge, tears everything down on close. |
-| Exchange simulator | Turns inbound `D`/`F` into `8`/`9` per §6. |
+| Exchange simulator | Version-neutral order logic per §6. Talks FIX through the sandbox version's **dialect** (§12). |
 | Bridge | Maps session and exchange events to the JSON events in API_CONTRACT §5; validates client commands; enforces rate and capacity limits. |
 | Web UI | Renders the stream; never speaks FIX itself. It uses `fix-core` only to show a live encoded preview and tag meanings. |
 
@@ -53,7 +53,7 @@ flowchart LR
 
 1. Serialize the body: `35=<type>` + SOH, then each field `tag=value` + SOH in order.
 2. `9` = byte length of that body.
-3. Header = `8=FIX.4.4` SOH `9=<len>` SOH.
+3. Header = `8=<profile.beginString>` SOH `9=<len>` SOH.
 4. CheckSum = (sum of bytes of header + body) mod 256, zero-padded to 3 digits.
 5. Append `10=<nnn>` SOH.
 
@@ -68,7 +68,7 @@ flowchart LR
 ```
 buffer += chunk
 loop:
-  i = indexOf("8=FIX.4.4\x019=")        # resync point
+  i = indexOf("8=" + <any registered BeginString> + "\x019=")   # resync point
   if i < 0: keep the last 12 bytes, stop  # a prefix may be split
   drop bytes before i (count as garbage)
   parse digits after "9=" up to SOH -> L  (need more bytes? stop)
@@ -275,4 +275,55 @@ These four examples MUST be covered by tests (TEST_PLAN §4) and SHOULD be avail
 
 - No message store persistence, no cross-process sessions, no public FIX port
 - No matching between visitors: each sandbox's exchange is independent
-- No FIX 5.0/FIXT, no repeating-group semantics
+- No repeating-group semantics; versions beyond 4.4 are added through §12, not special-cased
+
+---
+
+## 12. FIX versions (pluggable profiles)
+
+FIX Protocol Lab aims to show **every** FIX version working live. The design makes a version a unit of work, not a refactor.
+
+### What varies between versions
+
+| Concern | Where it lives | Example differences |
+|---|---|---|
+| BeginString, ApplVerID | `FixVersionProfile` | `FIX.4.2` / `FIX.4.4`; FIX 5.x sends `8=FIXT.1.1` plus `1128`/`1137` ApplVerID |
+| Tags, enums, message types | `FixDictionary` per version, built with `defineDictionary(base, overrides)`, so 4.3 extends 4.2 and 4.4 extends 4.3 | 4.2 has ExecTransType (20); 4.3+ drop it. ExecType fills are `1`/`2` in 4.2 and `F` in 4.3+ |
+| Session details | `profile.session` (extra Logon fields, admin types) | FIXT Logon adds DefaultApplVerID (1137) |
+| Order message shapes | `apps/server/src/dialects/<id>.ts` implementing `OrderDialect` | How an ExecutionReport for a fill is expressed |
+
+What does **not** vary, and stays version-neutral: codec byte rules (9/10), framing, sequence numbers, heartbeats, TestRequest, resend and gap fill, fault injection, the WS bridge and the UI.
+
+### `OrderDialect` (server)
+
+```ts
+interface OrderDialect {
+  readonly versionId: string;
+  newOrderSingle(o: NewOrder): FixField[];           // body fields for 35=D
+  cancelRequest(c: CancelRequest): FixField[];         // 35=F
+  executionReport(e: ExecEvent): FixField[];           // 35=8 (new / fill / cancel / reject)
+  cancelReject(r: CancelReject): FixField[];           // 35=9
+  parseExecutionReport(m: FixMessage): OrderUpdate;    // for the blotter
+}
+```
+
+The exchange simulator emits **version-neutral** `ExecEvent`s (`new`, `fill`, `canceled`, `rejected`). The dialect turns them into fields. Adding a version never touches `exchange.ts`.
+
+### Adding a version (checklist)
+
+1. `packages/fix-core/src/versions/<id>/`: `profile.ts` and `dictionary.ts` (derived from the nearest implemented version). Flip `status` from `planned` to `implemented`.
+2. `apps/server/src/dialects/<id>.ts`, plus registration in the dialect map.
+3. Golden vectors for that version in API_CONTRACT (a new §1.3 subsection), generated and verified byte for byte.
+4. Tests: `codec round-trips <id> golden vectors`, `session logs on and recovers a gap in <id>`, `exchange flow in <id> produces valid execution reports`.
+5. README and version picker copy (one-line `summary`).
+
+### Version roadmap
+
+| Order | Version | BeginString | Notes |
+|---|---|---|---|
+| v1 | FIX 4.4 | `FIX.4.4` | Implemented first; most common in production |
+| next | FIX 4.2 | `FIX.4.2` | Still widespread; ExecTransType and old ExecType semantics make a good contrast |
+| then | FIX 4.3 | `FIX.4.3` | Bridge between 4.2 and 4.4 |
+| then | FIX 5.0 SP2 | `FIXT.1.1` + ApplVerID `9` | Session/application split (FIXT); shows transport independence |
+
+Planned versions are registered with `status: "planned"` from day one, so the picker shows the roadmap, but they can't be selected, and `decode` rejects their BeginString until they're implemented.

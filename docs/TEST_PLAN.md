@@ -43,6 +43,12 @@
 | `framer resyncs after garbage bytes` | `xx…` + A1 → A1 emitted, garbage discarded |
 | `framer enforces max message size` | 9=70000 → `MESSAGE_TOO_LARGE` |
 | `runs without Node built-ins` | Guard test: `fix-core/src` imports no `node:*` and no `Buffer` |
+| `registry lists implemented and planned versions` | `listVersions()` includes FIX.4.4 `implemented`, and FIX.4.2, FIX.4.3, FIX.5.0SP2 `planned`, oldest first |
+| `registry rejects duplicate version ids` | `registerVersion` twice → throws |
+| `decode rejects unregistered or planned begin strings` | `8=FIX.4.2` (planned) and `8=FOO.1` → `UNKNOWN_VERSION` |
+| `supports a newly registered test version` | Register a fake implemented profile `FIX.9.9` in the test → encode/decode round trip works with no codec change |
+| `dictionary overrides compose over a base` | `defineDictionary(base, {tags, removeTags})` adds, overrides and removes as specified |
+| `no hard-coded begin string outside version profiles` | Guard test: `"FIX.4.4"` appears in source only under `versions/fix44/` (and in tests/vectors) |
 
 Coverage gate: ≥ 90% lines for `fix-core`.
 
@@ -75,6 +81,8 @@ Unit tests drive two `FixSession`s through an in-memory `ByteTransport` pipe wit
 | `fault corrupt_next_checksum triggers recovery` | Worked example D |
 | `fault pause_heartbeats still answers test requests` | Worked example C; no disconnect |
 | `logout handshake closes cleanly` | Logout → peer replies Logout → both DISCONNECTED |
+| `session uses version profile for logon` | Logon carries the profile's BeginString and `extraLogonFields` (a fake profile with `[[1137,"9"]]` proves it) |
+| `logs out on incorrect begin string` | Inbound message with another BeginString → Logout `Incorrect BeginString`, DISCONNECTED |
 | `queues new outbound messages during resend replay` | A message sent mid-replay goes out after the replay with the next seq |
 | `worked example A produces golden vectors A1 to A4` | With the fake clock at the example times, the `wire` raw bytes equal the vectors |
 
@@ -112,6 +120,9 @@ TCP integration (`transport.test.ts`, real sockets):
 | `health reports status and sandbox count` | `GET /health` shape per API_CONTRACT §6 |
 | `instruments endpoint lists symbols` | `GET /api/instruments` |
 | `serves built ui with spa fallback` | `GET /some/route` → index.html |
+| `versions endpoint lists registry` | `GET /api/versions` mirrors `listVersions()` |
+| `bridge rejects unsupported fix version` | `/ws?fixVersion=FIX.4.2` (planned) → `error` UNSUPPORTED_VERSION, close 1008 |
+| `fix44 dialect builds execution reports per spec` | New/fill/cancel/reject events → fields per API_CONTRACT §2 |
 
 ## 5. Web (apps/web, Vitest + Testing Library)
 
@@ -126,6 +137,8 @@ TCP integration (`transport.test.ts`, real sockets):
 | `clicking a tag opens its dictionary entry` | Click `54` → "Side", values 1=Buy, 2=Sell |
 | `fault buttons send fault inject commands` | Click → `fault.inject` sent over the mocked socket |
 | `reconnects with backoff after socket close` | Mock close → status "reconnecting", retry scheduled |
+| `version picker lists implemented and planned versions` | Planned versions visible, disabled, labelled "planned" |
+| `visualizer shows the fix version of each message` | Row or inspector shows `FIX.4.4` |
 
 ## 6. End-to-end (apps/web/e2e, Playwright)
 

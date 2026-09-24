@@ -45,7 +45,11 @@ fix-protocol-lab/
 │   │   │   ├── message.ts       # FixMessage type + helpers
 │   │   │   ├── errors.ts        # FixParseError + codes
 │   │   │   ├── time.ts          # UTCTimestamp format/parse (ms precision)
-│   │   │   └── dictionary/      # tags.ts, msgTypes.ts, enums (FIX 4.4 subset)
+│   │   │   ├── dictionary.ts    # FixDictionary type + defineDictionary(base, overrides)
+│   │   │   └── versions/
+│   │   │       ├── registry.ts  # registerVersion / getVersion / listVersions
+│   │   │       ├── fix44/       # profile.ts, dictionary.ts (implemented)
+│   │   │       └── planned.ts   # FIX.4.2, FIX.4.3, FIX.5.0SP2 metadata (status: planned)
 │   │   └── test/
 │   └── fix-session/
 │       ├── src/
@@ -62,7 +66,8 @@ fix-protocol-lab/
 │   │   │   ├── main.ts          # http server, static files, /health, /ws
 │   │   │   ├── config.ts
 │   │   │   ├── sandbox.ts       # one initiator+acceptor pair per WS client
-│   │   │   ├── exchange.ts      # simulated exchange (ARCHITECTURE §6)
+│   │   │   ├── exchange.ts      # simulated exchange (ARCHITECTURE §6), version-neutral
+│   │   │   ├── dialects/        # per-version order message builders/parsers (fix44.ts, …)
 │   │   │   ├── autoplay.ts      # scripted order generator
 │   │   │   └── bridge.ts        # FIX events -> WS events (API_CONTRACT §5)
 │   │   └── test/

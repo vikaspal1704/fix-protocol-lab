@@ -9,7 +9,7 @@ Read this file completely before writing code.
 
 ## 1. Mission
 
-Build a **from-scratch FIX 4.4 codec and TCP session engine in TypeScript**, and a **React front end that makes FIX visible**: order entry with a live encoded preview, a real-time sequence-diagram visualizer, fault injection with visible recovery, and an inline tag reference. Deploy it as a public demo on a custom domain.
+Build a **from-scratch, version-pluggable FIX codec and TCP session engine in TypeScript** (v1 implements FIX 4.4), and a **React front end that makes FIX visible**: order entry with a live encoded preview, a real-time sequence-diagram visualizer, fault injection with visible recovery, and an inline tag reference. Deploy it as a public demo on a custom domain.
 
 **The differentiator is clarity, not completeness.** Do not try to out-build QuickFIX/QuickFIX/J. Every feature should help someone *understand* FIX.
 
@@ -34,7 +34,9 @@ If docs conflict, prefer **API_CONTRACT → ARCHITECTURE → TRD → PRD**. The 
 
 Ship each phase green before starting the next. **Milestone M1 = Phases 1–2.** Stop and open a PR at M1.
 
-### Phase 1 — `fix-core` (codec)
+### Phase 1 — `fix-core` (codec + version registry)
+
+- Version registry first (ARCHITECTURE §12): `FixVersionProfile`, `registerVersion`, `getVersion`, `listVersions`, `versionForBeginString`. Register FIX 4.4 as `implemented`, and 4.2, 4.3 and 5.0 SP2 as `planned` (metadata only).
 
 - Scaffold npm workspaces, `tsconfig.base.json` (strict), ESLint/Prettier, Vitest, CI skeleton.
 - `encode`, `decode`, `computeCheckSum`, `toDisplay`/`fromDisplay`, field helpers, `FixParseError`.
@@ -84,7 +86,9 @@ Ship each phase green before starting the next. **Milestone M1 = Phases 1–2.**
 ## 5. Don't
 
 - Don't add QuickFIX or any FIX library, Express, Socket.IO, or CSS-in-JS runtimes
-- Don't implement FIX 5.0/FIXT, TLS, persistence or repeating-group semantics
+- Don't hard-code `"FIX.4.4"` outside `versions/fix44/`. Everything else goes through the registry
+- Don't implement a planned version without its profile, dictionary, dialect and golden vectors in the same change
+- Don't implement TLS, persistence or repeating-group semantics
 - Don't expose a raw FIX TCP port publicly or let the browser send raw FIX
 - Don't use real sleeps in tests (fake timers / `Clock`)
 - Don't use `any` in public APIs
@@ -140,5 +144,5 @@ Worked examples: [`ARCHITECTURE.md`](ARCHITECTURE.md) §8. Golden bytes: [`API_C
 
 ## 9. Out of scope reminder
 
-No real venues, no auth, no persistence, no FIX 5.0, no competing-engine ambitions.
+No real venues, no auth, no persistence, no competing-engine ambitions. New FIX versions are added one profile at a time.
 Clarity and correctness of the session layer > breadth of message types.

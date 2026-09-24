@@ -9,16 +9,18 @@
 
 ## 1. Goals
 
-1. Deliver a **correct, from-scratch FIX 4.4 codec and session engine** in TypeScript that proves an understanding of FIX beyond message format: sequencing, heartbeats, test requests and gap recovery.
-2. Make FIX **visible**: a live, sequence-diagram view of two counterparties exchanging real FIX over a real TCP session, with the ability to inject faults and watch recovery.
-3. Be the tool someone with **zero trading background** uses to understand FIX: plain-language README, an inline tag reference, and a session-layer write-up.
-4. Ship a **live public demo on a real domain**, with green CI and an MIT license.
-5. Be **agent-implementable**: locked wire rules, APIs, event shapes and test names, so there is no guesswork.
+1. Deliver a **correct, from-scratch FIX codec and session engine** in TypeScript that proves an understanding of FIX beyond message format: sequencing, heartbeats, test requests and gap recovery.
+2. Be **the place to see FIX working live**, across FIX versions. v1 ships FIX 4.4 end to end. The design is **version-pluggable**, so FIX 4.2, 4.3 and 5.0 (over FIXT.1.1) can be added one at a time, each as a self-contained profile, without touching the engine.
+3. Make FIX **visible**: a live, sequence-diagram view of two counterparties exchanging real FIX over a real TCP session, with the ability to inject faults and watch recovery.
+4. Be the tool someone with **zero trading background** uses to understand FIX: plain-language README, an inline tag reference, and a session-layer write-up.
+5. Ship a **live public demo on a real domain**, with green CI and an MIT license.
+6. Be **agent-implementable**: locked wire rules, APIs, event shapes and test names, so there is no guesswork.
 
 ## 2. Non-goals
 
 - Competing with QuickFIX / QuickFIX/J / QuickFIX/n on completeness or performance
-- FIX 5.0 / FIXT 1.1 transport, FAST, SBE, FIXML, or other encodings
+- Shipping every FIX version in v1 (v1 = FIX 4.4; others follow the version roadmap)
+- FAST, SBE, FIXML or other non-tag=value encodings
 - TLS, authentication of FIX counterparties, or certification against a real venue
 - Persistent message stores or recovery across process restarts
 - Repeating-group-aware business logic (groups are preserved in order, not interpreted)
@@ -78,7 +80,7 @@
 
 | ID | Requirement |
 |----|-------------|
-| F-MUST-1 | Codec encodes and decodes FIX 4.4 tag=value messages with SOH delimiters, computing and validating BodyLength (9) and CheckSum (10) exactly per API_CONTRACT §2. |
+| F-MUST-1 | Codec encodes and decodes tag=value messages for every **registered** FIX version with SOH delimiters, computing and validating BodyLength (9) and CheckSum (10) exactly per API_CONTRACT §1. |
 | F-MUST-2 | Codec preserves field order and duplicate tags (repeating groups) on decode and encode. |
 | F-MUST-3 | A streaming framer extracts complete messages from arbitrary TCP chunk boundaries. |
 | F-MUST-4 | Session engine over raw TCP (`node:net`), with initiator and acceptor roles: Logon, Heartbeat, TestRequest, ResendRequest, SequenceReset (GapFill and Reset), Reject, Logout. |
@@ -90,6 +92,8 @@
 | F-MUST-10 | Fault injection: `drop_next`, `pause_heartbeats`, `corrupt_next_checksum`, visibly recovered or handled per spec. |
 | F-MUST-11 | Each browser connection gets an **isolated sandbox** (its own initiator/acceptor pair). The public demo has caps and idle timeouts (TRD §6). |
 | F-MUST-12 | README explains FIX for a zero-background reader; MIT license; CI green; live demo deployed. |
+| F-MUST-13 | **Version registry:** every version-specific rule (BeginString, dictionary, logon fields, supported message types, order dialect) lives in a `FixVersionProfile`. Codec, session and server look versions up in the registry and never hard-code `"FIX.4.4"`. FIX 4.4 is registered and implemented. |
+| F-MUST-14 | The UI shows the version of every message and a version picker listing implemented and planned versions; planned versions are visible but disabled. |
 
 ### SHOULD
 
@@ -100,6 +104,7 @@
 | F-SHOULD-3 | Timeline controls: pause the live stream, filter admin messages, clear. |
 | F-SHOULD-4 | Custom domain with HTTPS for the demo. |
 | F-SHOULD-5 | Shareable "scenario" links (e.g. `?scenario=gap-recovery`) that auto-run a fault demo. |
+| F-SHOULD-6 | A second implemented version (**FIX 4.2**) to prove the profile design with real differences (ExecTransType 20, ExecType 1/2 for fills). |
 
 ### COULD
 
@@ -109,6 +114,7 @@
 | F-COULD-2 | Paste-a-message decoder page (decode any raw FIX string, highlight errors). |
 | F-COULD-3 | CLI tools: `fixlab decode`, `fixlab session --initiator`. |
 | F-COULD-4 | Export a session's message log as a `.fixlog` file. |
+| F-COULD-5 | Version diff view: the same order flow side by side in two versions, with changed tags highlighted. |
 
 ## 6. Non-functional requirements
 
@@ -123,7 +129,7 @@
 
 ## 7. Out of scope (explicit)
 
-- No competing-engine ambitions, no FIX 5.0/FIXT
+- No competing-engine ambitions; versions beyond 4.4 are roadmap, not v1
 - No real venues, no auth, no persistence
 - No public raw TCP endpoint
 

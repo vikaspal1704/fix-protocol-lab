@@ -20,6 +20,8 @@ Binary checklist. v1 is **done** only when every box is true. Milestone M1 = sec
 | F-MUST-10 | Fault injection and recovery | `fault drop_next consumes seq and triggers peer recovery`, `fault corrupt_next_checksum triggers recovery`, `fault pause_heartbeats still answers test requests`, `gap recovery scenario over websocket`, e2e `visitor triggers gap recovery` |
 | F-MUST-11 | Sandbox isolation and limits | `sandboxes are isolated`, `bridge enforces sandbox capacity`, `bridge rate limits order commands`, `sandbox closes after idle timeout`, `acceptor binds only to loopback on an ephemeral port` |
 | F-MUST-12 | README, license, CI, live demo | Sections D, E, F below |
+| F-MUST-13 | Version registry, no hard-coded versions | `registry lists implemented and planned versions`, `decode rejects unregistered or planned begin strings`, `session uses version profile for logon`, `no hard-coded begin string outside version profiles` |
+| F-MUST-14 | Version shown and selectable in UI | `bridge rejects unsupported fix version`, `version picker lists implemented and planned versions`, `visualizer shows the fix version of each message` |
 
 ---
 

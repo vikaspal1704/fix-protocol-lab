@@ -1,13 +1,13 @@
 # FIX Protocol Lab
 
-**Learn FIX by watching it.** A from-scratch FIX 4.4 toolkit (tag=value codec plus a TCP session engine) with a live, visual front end. You can see two counterparties log on, exchange heartbeats, trade, lose a message and recover it, one message at a time.
+**See FIX working, live.** A from-scratch FIX toolkit (tag=value codec plus a TCP session engine) with a live, visual front end. You can watch two counterparties log on, exchange heartbeats, trade, lose a message and recover it, one message at a time, and switch between FIX versions to see what changes.
 
 Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech).
 
 | | |
 |---|---|
 | **Status** | Docs-first — implementation pending |
-| **Protocol** | FIX 4.4 (tag=value over TCP) |
+| **Protocol** | FIX tag=value over TCP. v1 ships **FIX 4.4**; every version is a plug-in profile, and 4.2, 4.3 and 5.0 SP2 (over FIXT.1.1) are on the roadmap |
 | **Stack** | Node.js 22 + TypeScript (engine, server) · React 19 + TypeScript strict + Redux Toolkit/RTK Query + Tailwind v4 (UI) |
 | **Live demo** | `https://<your-domain>` (planned; see [Deploy](#deploy)) |
 | **License** | [MIT](LICENSE) |
@@ -40,11 +40,12 @@ Production engines like QuickFIX/J are excellent and complete, but they are text
 2. **`fix-session`**: a small initiator/acceptor over raw TCP. It implements Logon (A), Heartbeat (0), TestRequest (1), ResendRequest (2), SequenceReset/GapFill (4), Reject (3) and Logout (5), with sequence-number tracking and gap recovery.
 3. **Order entry simulator**: a React UI to compose NewOrderSingle (D) and OrderCancelRequest (F), see the encoded FIX, send it, and receive ExecutionReport (8) or OrderCancelReject (9) from a simulated exchange.
 4. **Live message-flow visualizer**: a real-time sequence diagram of every message between the two counterparties, streamed over WebSocket.
-5. **Tag reference panel**: click any tag in any message to see its name, meaning and allowed values.
+5. **Tag reference panel**: click any tag in any message to see its name, meaning and allowed values for the version in use.
+6. **Version profiles**: each FIX version (BeginString, dictionary, session rules, order-message dialect) is a self-contained profile in a registry. Adding FIX 4.2 or 5.0 means adding a profile and its tests, not changing the engine. The UI shows which versions are live and which are planned.
 
 ## What it is not
 
-- Not a production FIX engine: no persistence, no FIXT/FIX 5.0, no encryption, no certification.
+- Not a production FIX engine: no persistence, no encryption, no certification. Versions are added one profile at a time, not all at once.
 - Not connected to any real venue. Both counterparties are simulated inside one server.
 - Not a trading system: no risk checks, positions or real prices.
 
@@ -84,8 +85,9 @@ One Node web service serves the built UI, `GET /health` and `WS /ws`. The FIX TC
 
 | Milestone | Scope | Target |
 |---|---|---|
-| **M1** | `fix-core` codec + `fix-session` engine with tests (Phases 1–2) | 1–2 weekends |
+| **M1** | `fix-core` codec + version registry + `fix-session` engine with tests, FIX 4.4 (Phases 1–2) | 1–2 weekends |
 | **M2** | Exchange simulator, WebSocket bridge, order entry, visualizer, tag panel, deploy, session-layer write-up (Phases 3–5) | 2–3 weekends |
+| **M3+** | One version per step: FIX 4.2 → 4.3 → 5.0 SP2 over FIXT.1.1 (ARCHITECTURE §12) | ongoing |
 
 Ship M1 narrow and working before starting M2.
 
