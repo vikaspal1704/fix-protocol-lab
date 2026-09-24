@@ -207,30 +207,33 @@ All examples use `H = 30` for readability; the demo defaults to 10 s. The raw me
 
 ### A — Logon and a filled order
 
-| # | Time | From → To | Seq | Message |
+Delivery takes 1 ms in each direction (API_CONTRACT §1.3).
+
+| # | Time | From → To | Seq | Message (vector) |
 |---|------|-----------|-----|---------|
-| 1 | 10:00:00.000 | BUYSIDE → EXCH | 1 | Logon `98=0 108=30 141=Y` |
-| 2 | 10:00:00.012 | EXCH → BUYSIDE | 1 | Logon reply. Both sides ACTIVE, `nextInSeq=2` |
-| 3 | 10:00:05.000 | BUYSIDE → EXCH | 2 | NewOrderSingle `11=ORD-1 55=DEMO 54=1 38=100 40=2 44=101.25` |
-| 4 | 10:00:05.004 | EXCH → BUYSIDE | 2 | ExecutionReport New `37=EX-1 150=0 39=0 151=100` |
-| 5 | 10:00:05.254 | EXCH → BUYSIDE | 3 | ExecutionReport Trade `150=F 39=1 32=50 31=101.00 14=50 151=50` |
-| 6 | 10:00:05.504 | EXCH → BUYSIDE | 4 | ExecutionReport Trade `150=F 39=2 32=50 31=101.00 14=100 151=0 6=101.00` |
+| 1 | 10:00:00.000 | BUYSIDE → EXCH | 1 | Logon `98=0 108=30 141=Y` (A1) |
+| 2 | 10:00:00.001 | EXCH → BUYSIDE | 1 | Logon reply (A2). Both sides ACTIVE, `nextInSeq=2` |
+| 3 | 10:00:05.000 | BUYSIDE → EXCH | 2 | NewOrderSingle `11=ORD-1 55=DEMO 54=1 38=100 40=2 44=101.25` (A3) |
+| 4 | 10:00:05.001 | EXCH → BUYSIDE | 2 | ExecutionReport New `37=EX-1 150=0 39=0 151=100` (A4) |
+| 5 | 10:00:05.251 | EXCH → BUYSIDE | 3 | ExecutionReport Trade `150=F 39=1 32=50 31=101.00 14=50 151=50` |
+| 6 | 10:00:05.501 | EXCH → BUYSIDE | 4 | ExecutionReport Trade `150=F 39=2 32=50 31=101.00 14=100 151=0 6=101.00` |
 
 The buy limit 101.25 is ≥ refPx 101.00, so it crosses and fills at the reference price 101.00.
 
 ### B — Dropped message and gap recovery
 
-Continuing from A (EXCH last sent at 10:00:05.504, so its next idle heartbeat isn't due until 10:00:35.504):
+Continuing from A. BUYSIDE last sent at 10:00:05.000, so its idle Heartbeat is due at 10:00:35.000. EXCH last sent at 10:00:05.501, so its Heartbeat isn't due until 10:00:35.501, after the recovery below.
 
 | # | Time | From → To | Seq | Message (vector) |
 |---|------|-----------|-----|---------|
 | 7 | 10:00:20 | — | — | Visitor injects `drop_next` on BUYSIDE |
 | 8 | 10:00:35.000 | BUYSIDE → ✕ | 3 | Heartbeat — **dropped**, but it still consumes seq 3 (B1) |
-| 9 | 10:00:35.500 | BUYSIDE → EXCH | 4 | NewOrderSingle `ORD-2` sell 10 @ 102.00. EXCH expected 3, got 4 → **not processed** (B2) |
-| 10 | 10:00:35.501 | EXCH → BUYSIDE | 5 | ResendRequest `7=3 16=0`; EXCH enters RESENDING (B3) |
-| 11 | 10:00:35.511 | BUYSIDE → EXCH | 3 | SequenceReset-GapFill `43=Y 122=…35.000 123=Y 36=4`, because seq 3 was admin → EXCH `nextInSeq=4` (B4) |
-| 12 | 10:00:35.512 | BUYSIDE → EXCH | 4 | `ORD-2` resent with `43=Y 122=…35.500` → processed, `nextInSeq=5`, EXCH back to ACTIVE (B5) |
-| 13 | 10:00:35.512 | EXCH → BUYSIDE | 6 | ExecutionReport New for `ORD-2`. It rests, because sell 102.00 > refPx 101.00 |
+| 9 | 10:00:35.400 | BUYSIDE → EXCH | 4 | NewOrderSingle `ORD-2` sell 10 @ 102.00. EXCH expected 3, got 4 → **not processed** (B2) |
+| 10 | 10:00:35.401 | EXCH → BUYSIDE | 5 | ResendRequest `7=3 16=0`; EXCH enters RESENDING (B3) |
+| 11 | 10:00:35.402 | BUYSIDE → EXCH | 3 | SequenceReset-GapFill `43=Y 122=…35.000 123=Y 36=4`, because seq 3 was admin (B4) |
+| 12 | 10:00:35.402 | BUYSIDE → EXCH | 4 | `ORD-2` resent with `43=Y 122=…35.400` (B5) |
+| 13 | 10:00:35.403 | EXCH | — | Applies the GapFill (`nextInSeq=4`), processes `ORD-2` (`nextInSeq=5`) and returns to ACTIVE |
+| 14 | 10:00:35.403 | EXCH → BUYSIDE | 6 | ExecutionReport New for `ORD-2`. It rests, because sell 102.00 > refPx 101.00 |
 
 ### C — Paused heartbeats and TestRequest
 

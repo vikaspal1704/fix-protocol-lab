@@ -1,0 +1,14 @@
+{
+  "name": "@fixlab/fix-session",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": { "@fixlab/fix-core": "0.1.0" }
+}

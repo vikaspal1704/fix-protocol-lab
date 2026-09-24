@@ -1,0 +1,116 @@
+import { defineDictionary, type TagInfo } from "../../dictionary.js";
+
+const SIDE = { "1": "Buy", "2": "Sell" };
+const YES_NO = { Y: "Yes", N: "No" };
+
+const TAGS: readonly TagInfo[] = [
+  // Header / trailer
+  { tag: 8, name: "BeginString", type: "STRING", description: "Protocol version of the message; always the first field." },
+  { tag: 9, name: "BodyLength", type: "LENGTH", description: "Number of bytes after this field up to and including the delimiter before CheckSum (10)." },
+  { tag: 10, name: "CheckSum", type: "STRING", description: "Sum of every byte before this field, modulo 256, as three digits; always the last field." },
+  {
+    tag: 35,
+    name: "MsgType",
+    type: "STRING",
+    description: "What kind of message this is; always the third field.",
+    values: {
+      "0": "Heartbeat",
+      "1": "TestRequest",
+      "2": "ResendRequest",
+      "3": "Reject",
+      "4": "SequenceReset",
+      "5": "Logout",
+      "8": "ExecutionReport",
+      "9": "OrderCancelReject",
+      A: "Logon",
+      D: "NewOrderSingle",
+      F: "OrderCancelRequest",
+    },
+  },
+  { tag: 34, name: "MsgSeqNum", type: "SEQNUM", description: "Sequence number of this message within the session; each side counts up from 1." },
+  { tag: 49, name: "SenderCompID", type: "STRING", description: "Identifier of the firm sending the message." },
+  { tag: 56, name: "TargetCompID", type: "STRING", description: "Identifier of the firm the message is for." },
+  { tag: 52, name: "SendingTime", type: "UTCTIMESTAMP", description: "When the message was sent, in UTC." },
+  { tag: 43, name: "PossDupFlag", type: "BOOLEAN", description: "Y when this is a resend of a message that may already have been received.", values: YES_NO },
+  { tag: 97, name: "PossResend", type: "BOOLEAN", description: "Y when the message may have been sent before under a different sequence number.", values: YES_NO },
+  { tag: 122, name: "OrigSendingTime", type: "UTCTIMESTAMP", description: "Original SendingTime of a message that is being resent." },
+
+  // Session (admin) fields
+  { tag: 98, name: "EncryptMethod", type: "INT", description: "Encryption used on the session; 0 means none.", values: { "0": "None / other" } },
+  { tag: 108, name: "HeartBtInt", type: "INT", description: "Heartbeat interval in seconds agreed at Logon." },
+  { tag: 141, name: "ResetSeqNumFlag", type: "BOOLEAN", description: "Y on Logon to restart both sides' sequence numbers at 1.", values: YES_NO },
+  { tag: 112, name: "TestReqID", type: "STRING", description: "Identifier of a TestRequest; the answering Heartbeat echoes it." },
+  { tag: 7, name: "BeginSeqNo", type: "SEQNUM", description: "First sequence number to resend in a ResendRequest." },
+  { tag: 16, name: "EndSeqNo", type: "SEQNUM", description: "Last sequence number to resend; 0 means everything after BeginSeqNo." },
+  { tag: 123, name: "GapFillFlag", type: "BOOLEAN", description: "Y when a SequenceReset skips over messages that will not be resent.", values: YES_NO },
+  { tag: 36, name: "NewSeqNo", type: "SEQNUM", description: "Sequence number the receiver should expect next after a SequenceReset." },
+  { tag: 45, name: "RefSeqNum", type: "SEQNUM", description: "Sequence number of the message being rejected." },
+  { tag: 371, name: "RefTagID", type: "INT", description: "Tag that caused a session-level Reject." },
+  { tag: 372, name: "RefMsgType", type: "STRING", description: "MsgType of the message being rejected." },
+  {
+    tag: 373,
+    name: "SessionRejectReason",
+    type: "INT",
+    description: "Why a message was rejected at the session level.",
+    values: {
+      "0": "Invalid tag number",
+      "1": "Required tag missing",
+      "5": "Value is incorrect (out of range) for this tag",
+      "6": "Incorrect data format for value",
+      "9": "CompID problem",
+      "11": "Invalid MsgType",
+    },
+  },
+  { tag: 58, name: "Text", type: "STRING", description: "Free-form explanation, e.g. why an order or session was rejected." },
+
+  // Orders and executions
+  { tag: 11, name: "ClOrdID", type: "STRING", description: "Order identifier chosen by the client; unique per order or cancel request." },
+  { tag: 41, name: "OrigClOrdID", type: "STRING", description: "ClOrdID of the order a cancel request refers to." },
+  { tag: 37, name: "OrderID", type: "STRING", description: "Order identifier assigned by the exchange." },
+  { tag: 17, name: "ExecID", type: "STRING", description: "Unique identifier of this execution report." },
+  { tag: 55, name: "Symbol", type: "STRING", description: "Instrument being traded." },
+  { tag: 54, name: "Side", type: "CHAR", description: "Whether the order buys or sells.", values: SIDE },
+  { tag: 38, name: "OrderQty", type: "QTY", description: "Total quantity ordered." },
+  { tag: 40, name: "OrdType", type: "CHAR", description: "How the order is priced.", values: { "1": "Market", "2": "Limit" } },
+  { tag: 44, name: "Price", type: "PRICE", description: "Limit price; the worst price the order will accept." },
+  { tag: 59, name: "TimeInForce", type: "CHAR", description: "How long the order stays active.", values: { "0": "Day" } },
+  { tag: 60, name: "TransactTime", type: "UTCTIMESTAMP", description: "When the order or execution event happened." },
+  {
+    tag: 150,
+    name: "ExecType",
+    type: "CHAR",
+    description: "What this execution report is reporting.",
+    values: { "0": "New", "4": "Canceled", "8": "Rejected", F: "Trade (partial or full fill)" },
+  },
+  {
+    tag: 39,
+    name: "OrdStatus",
+    type: "CHAR",
+    description: "Current state of the order after this event.",
+    values: { "0": "New", "1": "Partially filled", "2": "Filled", "4": "Canceled", "8": "Rejected" },
+  },
+  { tag: 151, name: "LeavesQty", type: "QTY", description: "Quantity still open for further execution." },
+  { tag: 14, name: "CumQty", type: "QTY", description: "Total quantity filled so far." },
+  { tag: 6, name: "AvgPx", type: "PRICE", description: "Average price of all fills so far." },
+  { tag: 31, name: "LastPx", type: "PRICE", description: "Price of this fill." },
+  { tag: 32, name: "LastQty", type: "QTY", description: "Quantity of this fill." },
+  { tag: 434, name: "CxlRejResponseTo", type: "CHAR", description: "Which request an OrderCancelReject answers.", values: { "1": "Order cancel request" } },
+  { tag: 102, name: "CxlRejReason", type: "INT", description: "Why a cancel request was rejected.", values: { "0": "Too late to cancel", "1": "Unknown order" } },
+];
+
+export const fix44Dictionary = defineDictionary(null, {
+  tags: TAGS,
+  msgTypes: {
+    "0": { name: "Heartbeat", category: "admin", description: "Proves the connection is alive; also answers a TestRequest." },
+    "1": { name: "TestRequest", category: "admin", description: "Asks the other side to send a Heartbeat right away." },
+    "2": { name: "ResendRequest", category: "admin", description: "Asks the other side to resend a range of messages after a sequence gap." },
+    "3": { name: "Reject", category: "admin", description: "Session-level rejection of a message that broke a protocol rule." },
+    "4": { name: "SequenceReset", category: "admin", description: "Moves the expected sequence number forward, e.g. to skip admin messages during a resend." },
+    "5": { name: "Logout", category: "admin", description: "Starts or confirms the end of a session." },
+    A: { name: "Logon", category: "admin", description: "Opens a session and agrees the heartbeat interval." },
+    D: { name: "NewOrderSingle", category: "app", description: "Submits a new order." },
+    F: { name: "OrderCancelRequest", category: "app", description: "Asks to cancel an open order." },
+    "8": { name: "ExecutionReport", category: "app", description: "Reports an order event: accepted, filled, canceled or rejected." },
+    "9": { name: "OrderCancelReject", category: "app", description: "Says a cancel request could not be carried out." },
+  },
+});
