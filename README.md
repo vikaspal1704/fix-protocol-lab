@@ -6,10 +6,10 @@ Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech).
 
 | | |
 |---|---|
-| **Status** | Implemented (M1 + M2) — 98 tests incl. Playwright e2e; see [CI](.github/workflows/ci.yml). Live demo: deploy pending |
+| **Status** | Implemented (M1 + M2) — 98 tests incl. Playwright e2e; see [CI](.github/workflows/ci.yml). Deployed, checked by the [live smoke test](.github/workflows/live-smoke.yml) |
 | **Protocol** | FIX tag=value over TCP. v1 ships **FIX 4.4**; every version is a plug-in profile, and 4.2, 4.3 and 5.0 SP2 (over FIXT.1.1) are on the roadmap |
 | **Stack** | Node.js 22 + TypeScript (engine, server) · React 19 + TypeScript strict + Redux Toolkit/RTK Query + Tailwind v4 (UI) |
-| **Live demo** | `https://<your-domain>` (planned; see [Deploy](#deploy)) |
+| **Live demo** | **https://fix-protocol-lab.onrender.com** · jump straight into gap recovery: [`?scenario=gap-recovery`](https://fix-protocol-lab.onrender.com/?scenario=gap-recovery) |
 | **License** | [MIT](LICENSE) |
 | **Repo** | https://github.com/vikaspal1704/fix-protocol-lab |
 
@@ -76,6 +76,7 @@ npm test               # vitest across all packages
 npm run dev            # server on :8080 + Vite dev server on :5173 (open :5173)
 npm run build && npm start   # production: one Node process serves UI + WebSocket on :8080
 npm run e2e            # Playwright end-to-end against the production build
+BASE_URL=http://localhost:8080 node scripts/live-smoke.mjs   # protocol smoke test against any running instance
 ```
 
 ## Project layout
@@ -97,7 +98,10 @@ One Node web service serves the built UI, `GET /health` and `WS /ws`. The FIX TC
 
 1. Render dashboard → **New → Blueprint** → pick this repo → **Apply** ([`render.yaml`](render.yaml); tracks `main`).
 2. Add your domain under the service's **Settings → Custom Domains** and point a CNAME at it; Render issues HTTPS.
-3. Share links like `https://<your-domain>/?scenario=gap-recovery` to open straight into a demo.
+3. Share links like `https://fix-protocol-lab.onrender.com/?scenario=gap-recovery` to open straight into a demo.
+4. Check the deploy: Actions → **Live smoke test** → Run workflow (defaults to the Render URL).
+
+Free Render instances sleep when idle, so the first visit can take up to a minute while the page shows "waking the server…".
 
 See [`docs/TRD.md`](docs/TRD.md) §9.
 
