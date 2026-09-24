@@ -12,7 +12,7 @@ import {
 } from "@fixlab/fix-session";
 
 import type { Instrument } from "./config.js";
-import { dialectFor, type OrderDialect, type OrderSide, type OrderStatus, type OrdType } from "./dialects/index.js";
+import { dialectFor, type OrderDialect, type OrderSide, type OrderStatus, type OrdType } from "@fixlab/fix-orders";
 import { ExchangeSimulator } from "./exchange.js";
 
 export const BUYSIDE = "BUYSIDE";

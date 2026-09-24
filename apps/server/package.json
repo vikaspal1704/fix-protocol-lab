@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fixlab/fix-core": "0.1.0",
+    "@fixlab/fix-orders": "0.1.0",
     "@fixlab/fix-session": "0.1.0",
     "ws": "^8.18.0"
   },

@@ -13,7 +13,7 @@ import type { FaultKind, WireEvent } from "@fixlab/fix-session";
 import type { WebSocket } from "ws";
 
 import { INSTRUMENTS, type ServerConfig } from "./config.js";
-import { hasDialect } from "./dialects/index.js";
+import { hasDialect } from "@fixlab/fix-orders";
 import { BUYSIDE, EXCH, Sandbox, SandboxError, type BlotterEntry, type SandboxEvent, type Side } from "./sandbox.js";
 
 export const APP_VERSION = "0.1.0";

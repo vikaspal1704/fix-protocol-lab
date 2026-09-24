@@ -2,5 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "dist", "types": ["node"] },
   "include": ["src"],
-  "references": [{ "path": "../../packages/fix-core" }, { "path": "../../packages/fix-session" }]
+  "references": [{ "path": "../../packages/fix-core" }, { "path": "../../packages/fix-session" },
+    { "path": "../../packages/fix-orders" }]
 }

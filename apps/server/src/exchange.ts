@@ -2,7 +2,7 @@ import { formatUtcTimestamp, type FixField, type FixMessage } from "@fixlab/fix-
 import type { Clock } from "@fixlab/fix-session";
 
 import type { Instrument } from "./config.js";
-import type { ExecEvent, NewOrder, OrderDialect, OrderStatus, WorkingOrder } from "./dialects/index.js";
+import type { ExecEvent, NewOrder, OrderDialect, OrderStatus, WorkingOrder } from "@fixlab/fix-orders";
 
 export const FIRST_FILL_DELAY_MS = 250;
 export const SECOND_FILL_DELAY_MS = 500;

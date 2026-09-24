@@ -4,6 +4,7 @@
   "type": "module",
   "workspaces": [
     "packages/fix-core",
+    "packages/fix-orders",
     "packages/fix-session",
     "apps/server",
     "apps/web"
@@ -12,9 +13,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -b packages/fix-core packages/fix-session apps/server && npm run build -w apps/web",
+    "build": "tsc -b packages/fix-core packages/fix-orders packages/fix-session apps/server && npm run build -w apps/web",
     "test": "vitest run",
-    "lint": "eslint . && tsc -b packages/fix-core packages/fix-session apps/server --noEmit false && npm run typecheck -w apps/web",
+    "lint": "eslint . && tsc -b packages/fix-core packages/fix-orders packages/fix-session apps/server && npm run typecheck -w apps/web",
     "format": "prettier --write .",
     "dev": "npm run dev -w apps/server & npm run dev -w apps/web",
     "start": "node apps/server/dist/main.js",
