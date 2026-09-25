@@ -3,13 +3,14 @@
 //
 //   BASE_URL=https://fix-protocol-lab.onrender.com node scripts/live-smoke.mjs
 //
-// Checks /health, the UI page, /api/versions, then opens /ws and drives a real
-// sandbox: both sides log on, an order fills, and the "Lose a message" scenario
-// is recovered through ResendRequest + GapFill/PossDup. No dependencies: uses
-// Node 22's built-in fetch and WebSocket.
+// Checks /health, the UI page, /api/versions, then, for every implemented FIX
+// version, opens /ws?fixVersion=<id> and drives a real sandbox: both sides log
+// on, an order fills, and the "Lose a message" scenario is recovered through
+// ResendRequest + GapFill/PossDup. No dependencies: uses Node 22's built-in
+// fetch and WebSocket.
 
 const BASE_URL = (process.env.BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
-const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 60_000);
+const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 120_000);
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -42,11 +43,12 @@ async function checkHttp() {
   if (!list?.some((v) => v.id === "FIX.4.4" && v.status === "implemented"))
     fail("FIX.4.4 not listed as implemented");
   ok(`/api/versions lists ${list.map((v) => `${v.id}(${v.status})`).join(", ")}`);
+  return list.filter((v) => v.status === "implemented");
 }
 
 /** Opens /ws and resolves helpers for waiting on server events. */
-function openSandbox() {
-  const wsUrl = `${BASE_URL.replace(/^http/, "ws")}/ws`;
+function openSandbox(fixVersion) {
+  const wsUrl = `${BASE_URL.replace(/^http/, "ws")}/ws?fixVersion=${encodeURIComponent(fixVersion)}`;
   const ws = new WebSocket(wsUrl);
   const events = [];
   const waiters = [];
@@ -92,15 +94,19 @@ const isFix =
     e.from === from &&
     e.msgType === msgType &&
     extra(e);
+const tagOf = (e, tag) => e.fields.find(([t]) => t === tag)?.[1];
 const isOrder = (clOrdId, status) => (e) =>
   e.type === "order.update" && e.clOrdId === clOrdId && e.status === status;
 
-async function checkSession() {
-  const { ws, events, waitFor, send, opened } = openSandbox();
+async function checkSession(version) {
+  const { ws, events, waitFor, send, opened } = openSandbox(version.id);
   await opened;
+  const ok = (message) => console.log(`ok   [${version.id}] ${message}`);
 
   const hello = await waitFor("hello", (e) => e.type === "hello");
-  ok(`hello: sandbox ${hello.sandboxId}, ${hello.fixVersion}, HeartBtInt ${hello.heartBtIntSec}s`);
+  if (hello.fixVersion !== version.id)
+    fail(`hello says ${hello.fixVersion}, expected ${version.id}`);
+  ok(`hello: sandbox ${hello.sandboxId}, HeartBtInt ${hello.heartBtIntSec}s`);
 
   await Promise.all([
     waitFor("BUYSIDE ACTIVE", isState("BUYSIDE", "ACTIVE")),
@@ -125,7 +131,12 @@ async function checkSession() {
   await waitFor(`${first} FILLED`, isOrder(first, "FILLED"));
   if (!events.some(isFix("BUYSIDE", "D"))) fail("EXCH never received the NewOrderSingle (35=D)");
   const reports = events.filter(isFix("EXCH", "8"));
-  ok(`${first}: 35=D sent, ${reports.length} ExecutionReports (35=8), FILLED`);
+  const fillTypes = [
+    ...new Set(reports.filter((e) => tagOf(e, 32) !== undefined).map((e) => tagOf(e, 150))),
+  ];
+  ok(
+    `${first}: 35=D sent, ${reports.length} ExecutionReports (35=8), fills as 150=${fillTypes.join("/")}, FILLED`,
+  );
 
   // 2. "Lose a message": drop BUYSIDE's next order; the following one exposes the gap.
   send({ type: "fault.inject", side: "BUYSIDE", kind: "drop_next" });
@@ -168,16 +179,11 @@ async function checkSession() {
   const lost = clOrdIds.find((id) => id !== first);
   if (!lost) fail("no order.update for the dropped order");
   await waitFor(`${lost} FILLED`, isOrder(lost, "FILLED"));
+  // Only fills carry LastQty (32); ExecType differs by version (F, or 1/2 in FIX 4.2).
   const fills = events.filter(
-    (e) =>
-      isFix("EXCH", "8")(e) &&
-      e.fields.some(([t, v]) => t === 11 && v === lost) &&
-      e.fields.some(([t, v]) => t === 150 && v === "F"),
+    (e) => isFix("EXCH", "8")(e) && tagOf(e, 11) === lost && tagOf(e, 32) !== undefined,
   );
-  const filledQty = fills.reduce(
-    (sum, e) => sum + Number(e.fields.find(([t]) => t === 32)?.[1] ?? 0),
-    0,
-  );
+  const filledQty = fills.reduce((sum, e) => sum + Number(tagOf(e, 32)), 0);
   if (filledQty !== 10)
     fail(`${lost} filled ${filledQty}, expected 10 (processed more than once?)`);
   ok(`${lost} (the dropped order) was recovered and FILLED exactly once`);
@@ -188,14 +194,21 @@ async function checkSession() {
   send({ type: "session.logout", side: "BUYSIDE" });
   await waitFor("Logout", isFix("EXCH", "5"));
   ok("Logout (35=5) acknowledged");
+
+  const wire = events.filter((e) => e.type === "fix.message");
+  const foreign = wire.find(
+    (e) => !e.raw.startsWith(`8=${version.beginString}|`) || e.fixVersion !== version.id,
+  );
+  if (foreign) fail(`[${version.id}] message not in ${version.beginString}: ${foreign.raw}`);
+  ok(`all ${wire.length} messages are ${version.beginString}`);
   ws.close();
 }
 
 const timer = setTimeout(() => fail(`timed out after ${TIMEOUT_MS} ms`), TIMEOUT_MS);
 try {
   console.log(`Smoke test against ${BASE_URL}`);
-  await checkHttp();
-  await checkSession();
+  const versions = await checkHttp();
+  for (const version of versions) await checkSession(version);
   clearTimeout(timer);
   console.log("PASS");
 } catch (err) {

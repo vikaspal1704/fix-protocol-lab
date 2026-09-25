@@ -6,8 +6,8 @@ Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech).
 
 | | |
 |---|---|
-| **Status** | Implemented (M1 + M2) — 98 tests incl. Playwright e2e; see [CI](.github/workflows/ci.yml). Deployed, checked by the [live smoke test](.github/workflows/live-smoke.yml) |
-| **Protocol** | FIX tag=value over TCP. v1 ships **FIX 4.4**; every version is a plug-in profile, and 4.2, 4.3 and 5.0 SP2 (over FIXT.1.1) are on the roadmap |
+| **Status** | Implemented (M1–M3), four FIX versions; tests incl. Playwright e2e in [CI](.github/workflows/ci.yml). Deployed, checked by the [live smoke test](.github/workflows/live-smoke.yml) |
+| **Protocol** | FIX tag=value over TCP, in **FIX 4.2, 4.3, 4.4 and 5.0 SP2** (over FIXT.1.1). Every version is a plug-in profile; pick one in the UI or with `?fixVersion=` |
 | **Stack** | Node.js 22 + TypeScript (engine, server) · React 19 + TypeScript strict + Redux Toolkit/RTK Query + Tailwind v4 (UI) |
 | **Live demo** | **https://fix-protocol-lab.onrender.com** · jump straight into gap recovery: [`?scenario=gap-recovery`](https://fix-protocol-lab.onrender.com/?scenario=gap-recovery) |
 | **License** | [MIT](LICENSE) |
@@ -41,7 +41,21 @@ Production engines like QuickFIX/J are excellent and complete, but they are text
 3. **Order entry simulator**: a React UI to compose NewOrderSingle (D) and OrderCancelRequest (F), see the encoded FIX, send it, and receive ExecutionReport (8) or OrderCancelReject (9) from a simulated exchange.
 4. **Live message-flow visualizer**: a real-time sequence diagram of every message between the two counterparties, streamed over WebSocket.
 5. **Tag reference panel**: click any tag in any message to see its name, meaning and allowed values for the version in use.
-6. **Version profiles**: each FIX version (BeginString, dictionary, session rules, order-message dialect) is a self-contained profile in a registry. Adding FIX 4.2 or 5.0 means adding a profile and its tests, not changing the engine. The UI shows which versions are live and which are planned.
+6. **Four FIX versions, side by side**: each version (BeginString, dictionary, session rules, order-message dialect) is a self-contained profile in a registry. Switch versions in the UI and watch the same trade change shape (see the table below). Adding another version means adding a profile and its tests, not changing the engine.
+
+### The same trade in four FIX versions
+
+Buy 100 DEMO at 101.25, filled in two parts. The session layer (logon, heartbeats, sequence numbers, recovery) is identical in every version; this is what changes:
+
+| | [FIX 4.2](https://fix-protocol-lab.onrender.com/?fixVersion=FIX.4.2) | [FIX 4.3](https://fix-protocol-lab.onrender.com/?fixVersion=FIX.4.3) | [FIX 4.4](https://fix-protocol-lab.onrender.com/?fixVersion=FIX.4.4) | [FIX 5.0 SP2](https://fix-protocol-lab.onrender.com/?fixVersion=FIX.5.0SP2) |
+|---|---|---|---|---|
+| BeginString (8) | `FIX.4.2` | `FIX.4.3` | `FIX.4.4` | `FIXT.1.1`: FIX 5 splits the session layer (FIXT) from the application layer |
+| Logon | | | | adds `1137=9` DefaultApplVerID: "business messages are FIX 5.0 SP2" |
+| New order (35=D) | needs `21=1` HandlInst | needs `21=1` HandlInst | | |
+| Execution report (35=8) | carries `20=0` ExecTransType | | | |
+| A fill says | `150=1` partial / `150=2` full | `150=F` (Trade) | `150=F` | `150=F` |
+
+Every cell is backed by byte-exact golden vectors ([API_CONTRACT §1.4](docs/API_CONTRACT.md)).
 
 ## What it is not
 
@@ -111,7 +125,8 @@ See [`docs/TRD.md`](docs/TRD.md) §9.
 |---|---|---|
 | **M1** | `fix-core` codec + version registry + `fix-session` engine with tests, FIX 4.4 (Phases 1–2) | 1–2 weekends |
 | **M2** | Exchange simulator, WebSocket bridge, order entry, visualizer, tag panel, deploy, session-layer write-up (Phases 3–5) | 2–3 weekends |
-| **M3+** | One version per step: FIX 4.2 → 4.3 → 5.0 SP2 over FIXT.1.1 (ARCHITECTURE §12) | ongoing |
+| **M3** | FIX 4.2, 4.3 and 5.0 SP2 over FIXT.1.1, each with golden vectors (ARCHITECTURE §12) | done |
+| **M4+** | Candidates: FIX 4.0, 4.1, 5.0, 5.0 SP1 | next |
 
 Ship M1 narrow and working before starting M2.
 

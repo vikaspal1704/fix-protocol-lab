@@ -421,6 +421,16 @@ export class FixSession extends Emitter<SessionEvents> {
       this.logoutAndDisconnect("CompID problem");
       return;
     }
+    // Version-specific Logon fields (e.g. FIXT DefaultApplVerID 1137) must match this profile.
+    for (const [tag, expected] of this.profile.session.extraLogonFields) {
+      const value = getField(msg, tag);
+      if (value === expected) continue;
+      const text = value === undefined ? `Required tag ${tag} missing` : `Tag ${tag} must be ${expected}`;
+      this.resetSequences();
+      this.sendReject(seq ?? 1, "A", value === undefined ? 1 : 5, tag, text);
+      this.logoutAndDisconnect(text);
+      return;
+    }
     const peerInterval = Number(getField(msg, 108));
     if (Number.isInteger(peerInterval) && peerInterval > 0) this.heartBtIntSec = peerInterval;
 

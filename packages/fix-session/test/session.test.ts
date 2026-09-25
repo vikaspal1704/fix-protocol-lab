@@ -2,7 +2,7 @@ import { encode, formatUtcTimestamp, getField, getImplementedVersion, registerVe
 import { describe, expect, it } from "vitest";
 
 import { createPipe, FixSession, ManualClock } from "../src/index.js";
-import { VECTORS } from "../../fix-core/test/vectors.js";
+import { VECTORS, VERSION_VECTORS } from "../../fix-core/test/vectors.js";
 import { loggedOn, order, pair, raw, T0 } from "./harness.js";
 
 const at = (ms: number) => T0 + ms;
@@ -348,7 +348,7 @@ describe("sequence numbers and recovery", () => {
   it("treats unimplemented begin strings as garbled", () => {
     const { clock, exch, pipes } = loggedOn();
 
-    pipes[0].write(new TextEncoder().encode("8=FIX.4.2\x019=5\x0135=0\x0110=000\x01"));
+    pipes[0].write(new TextEncoder().encode("8=FIX.4.1\x019=5\x0135=0\x0110=000\x01"));
     clock.advance(1);
 
     expect(exch.wire.at(-1)!.note).toBe("garbled: UNKNOWN_VERSION (ignored)");
@@ -363,6 +363,49 @@ describe("sequence numbers and recovery", () => {
 
     expect(buy.states.at(-1)).toBe("DISCONNECTED:logout complete");
     expect(exch.states.at(-1)).toBe("DISCONNECTED:peer logged out");
+  });
+});
+
+describe("fix versions", () => {
+  for (const [version, vectors] of Object.entries(VERSION_VECTORS)) {
+    it(`session logs on and recovers a gap in ${version}`, () => {
+      const { clock, buy, exch } = pair({ version });
+      const beginString = getImplementedVersion(version).beginString;
+
+      buy.session.logon();
+      clock.advance(2);
+      expect([buy.sent()[0], exch.sent()[0]]).toEqual([vectors.LOGON, vectors.LOGON_REPLY]);
+
+      buy.session.injectFault("drop_next");
+      buy.session.send("D", order("ORD-1", "1", 10, "101.25", clock.now()));
+      clock.advance(400);
+      buy.session.send("D", order("ORD-2", "2", 10, "102.00", clock.now()));
+      clock.advance(5);
+
+      expect(exch.sentTypes()).toContain("2"); // ResendRequest
+      // 16=0 asks for everything from the gap on, so both orders are replayed as PossDup.
+      const replay = buy.wire.filter((w) => w.direction === "out" && w.possDup).map((w) => getField(w.msg!, 11));
+      expect(replay).toEqual(["ORD-1", "ORD-2"]);
+      expect(exch.app).toEqual(["D", "D"]);
+      expect([buy.session.state, exch.session.state]).toEqual(["ACTIVE", "ACTIVE"]);
+      for (const w of [...buy.wire, ...exch.wire]) expect(w.msg!.beginString).toBe(beginString);
+    });
+  }
+
+  it("fixt acceptor rejects logon without DefaultApplVerID", () => {
+    const clock = new ManualClock(T0);
+    const [a, b] = createPipe(clock, 1);
+    const acceptor = new FixSession({ role: "acceptor", senderCompId: "EXCH", targetCompId: "BUYSIDE", version: "FIX.5.0SP2", heartBtIntSec: 30, clock });
+    const replies: string[] = [];
+    acceptor.on("wire", (w) => w.direction === "out" && replies.push(`${w.msg!.msgType}:${getField(w.msg!, 371) ?? ""}:${getField(w.msg!, 58) ?? ""}`));
+    acceptor.attach(b);
+
+    const fields: [number, string][] = [[49, "BUYSIDE"], [56, "EXCH"], [34, "1"], [52, formatUtcTimestamp(T0)], [98, "0"], [108, "30"], [141, "Y"]];
+    a.write(encode({ beginString: "FIXT.1.1", msgType: "A", fields }));
+    clock.advance(2);
+
+    expect(replies).toEqual(["3:1137:Required tag 1137 missing", "5::Required tag 1137 missing"]);
+    expect(acceptor.state).toBe("DISCONNECTED");
   });
 });
 
