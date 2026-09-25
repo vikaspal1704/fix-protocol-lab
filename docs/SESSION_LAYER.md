@@ -174,7 +174,7 @@ A few design choices in FIX Protocol Lab's engine are worth calling out:
 - **Transport-agnostic core.** `FixSession` only sees a byte transport with `write`, `onData` and `onClose`. In production that's a TCP socket on loopback; in tests it's an in-memory pipe. The session logic never knows the difference.
 - **An injectable clock.** Every timer (heartbeats, TestRequests, logon and logout timeouts) goes through a `Clock`. Tests use a manual clock, so a whole 35-second recovery scenario runs in microseconds and is fully deterministic. The golden messages above are **reproduced byte for byte** by the test suite, timestamps and checksums included.
 - **Faults are a first-class feature, not a test hack.** "Drop next", "corrupt next checksum" and "pause heartbeats" are part of the engine, because the whole point of the lab is to watch recovery happen.
-- **Versions are profiles.** BeginString, dictionaries, extra Logon fields and order-message shapes live in a per-version profile. The session rules above are the same in FIX 4.2, 4.4 and FIXT.1.1, which is why adding a version doesn't touch this code.
+- **Versions are profiles.** BeginString, dictionaries, extra Logon fields and order-message shapes live in a per-version profile. The session rules above are the same in FIX 4.2, 4.3, 4.4 and FIXT.1.1 (FIX 5.0 SP2), and the tests replay the gap recovery in each one. The only session-level difference is that a FIXT Logon must agree DefaultApplVerID (`1137=9`); the acceptor rejects a Logon without it.
 
 ---
 

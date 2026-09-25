@@ -1,0 +1,37 @@
+name: Live smoke test
+
+# Checks a deployed instance end to end with scripts/live-smoke.mjs: /health,
+# the UI page, /api/versions, then a real WebSocket sandbox (logon, an order
+# filled, a dropped message recovered through ResendRequest, logout).
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Base URL of the deployed service
+        default: https://fix-protocol-lab.onrender.com
+        required: true
+  pull_request:
+    paths:
+      - scripts/live-smoke.mjs
+      - .github/workflows/live-smoke.yml
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: ${{ inputs.url || 'https://fix-protocol-lab.onrender.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Health (waits for a sleeping free instance to wake)
+        run: |
+          for _ in $(seq 1 24); do
+            if curl -sf --max-time 20 "$BASE_URL/health"; then echo; exit 0; fi
+            sleep 5
+          done
+          echo "::error::$BASE_URL/health did not respond"; exit 1
+      - name: End-to-end smoke
+        run: node scripts/live-smoke.mjs

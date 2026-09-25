@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { MAX_BACKOFF_MS, MIN_BACKOFF_MS } from "./features/connection/wsMiddleware";
 import { FakeWebSocket } from "./test/fakeSocket";
-import { fixEvent, renderLive } from "./test/render";
+import { fixEvent, HELLO, renderLive } from "./test/render";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -145,7 +145,27 @@ describe("session controls", () => {
 
     const picker = screen.getByRole("radiogroup", { name: "FIX version" });
     expect(within(picker).getByRole("radio", { name: /FIX 4\.4/ })).toBeChecked();
-    expect(within(picker).getByRole("radio", { name: /FIX 4\.2.*planned/i })).toBeDisabled();
+    expect(within(picker).getByRole("radio", { name: /FIX 4\.2/ })).toBeEnabled();
+    expect(within(picker).getByRole("radio", { name: /FIX 4\.1.*planned/i })).toBeDisabled();
+    expect(screen.getByTestId("version-summary")).toHaveTextContent("Most deployed.");
+  });
+
+  it("switching version reconnects and encodes orders for that version", async () => {
+    renderLive(<App />);
+
+    await userEvent.click(screen.getByRole("radio", { name: /FIX 4\.2/ }));
+    const ws = FakeWebSocket.latest();
+    expect(ws.url).toContain("/ws?fixVersion=FIX.4.2");
+    act(() => ws.open());
+    act(() => ws.emit({ ...HELLO, fixVersion: "FIX.4.2" }));
+    for (const side of ["BUYSIDE", "EXCH"] as const) {
+      act(() => ws.emit({ type: "session.state", side, state: "ACTIVE", reason: "logged on", nextOutSeq: 2, nextInSeq: 2, at: 0 }));
+    }
+
+    const preview = screen.getByTestId("encoded-preview").textContent!;
+    expect(preview).toMatch(/^8=FIX\.4\.2\|9=\d+\|35=D\|/);
+    expect(preview).toContain("|21=1|"); // HandlInst is required before FIX 4.4
+    expect(screen.getByTestId("version-summary")).toHaveTextContent("Fills use ExecType 1/2.");
   });
 
   it("reconnects with backoff after socket close", () => {
