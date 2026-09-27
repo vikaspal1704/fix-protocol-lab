@@ -4,11 +4,11 @@
 
 ---
 
-## 1. FIX wire rules (all versions; values shown for FIX 4.4)
+## 1. FIX wire rules (all versions; examples shown in FIX 4.4 unless stated)
 
 | Rule | Value |
 |------|-------|
-| BeginString (8) | Must equal the `beginString` of a **registered** version profile (§3.1). v1: `FIX.4.4`. FIX 5.x uses `FIXT.1.1` plus ApplVerID (1128/1137), per ARCHITECTURE §12 |
+| BeginString (8) | Must equal the `beginString` of an **implemented** version profile (§3.1): `FIX.4.2`, `FIX.4.3`, `FIX.4.4`, or `FIXT.1.1` for FIX 5.0 SP2 (whose Logon adds DefaultApplVerID `1137=9`), per ARCHITECTURE §12 |
 | Field syntax | `<tag>=<value><SOH>`, where `SOH` = byte `0x01`; tag is a positive integer without leading zeros; value is non-empty and contains no SOH |
 | Field order | `8`, then `9`, then `35` must be the first three fields; `10` must be the last field |
 | Required header | `49` SenderCompID, `56` TargetCompID, `34` MsgSeqNum, `52` SendingTime |
@@ -66,6 +66,62 @@ E1  CheckSum 000
 
 E2  CheckSum 255
 8=FIX.4.4|9=96|35=4|49=BUYSIDE|56=EXCH|34=3|52=20260924-10:01:00.010|43=Y|122=20260924-10:00:30.000|123=Y|36=4|10=255|
+```
+
+### 1.4 Golden vectors per FIX version (MUST pass byte for byte)
+
+Worked example A (Logon both ways, then ORD-1: buy 100 DEMO @ 101.25) replayed in every implemented version on the same 1 ms timeline, through the real session engine and exchange simulator, continued through the partial and full fill. The FIX 4.4 LOGON, LOGON_REPLY, ORDER and ACK lines are A1, A2, A3 and A4. What changes between versions:
+
+| | FIX 4.2 | FIX 4.3 | FIX 4.4 | FIX 5.0 SP2 |
+|---|---|---|---|---|
+| BeginString (8) | `FIX.4.2` | `FIX.4.3` | `FIX.4.4` | `FIXT.1.1` |
+| Logon extra | | | | `1137=9` DefaultApplVerID |
+| NewOrderSingle | `21=1` HandlInst | `21=1` HandlInst | | |
+| ExecutionReport | `20=0` ExecTransType | | | |
+| Fill ExecType (150) | `1` partial / `2` full | `F` | `F` | `F` |
+
+**FIX.4.2**
+
+```
+LOGON       8=FIX.4.2|9=72|35=A|49=BUYSIDE|56=EXCH|34=1|52=20260924-10:00:00.000|98=0|108=30|141=Y|10=081|
+LOGON_REPLY 8=FIX.4.2|9=72|35=A|49=EXCH|56=BUYSIDE|34=1|52=20260924-10:00:00.001|98=0|108=30|141=Y|10=082|
+ORDER       8=FIX.4.2|9=133|35=D|49=BUYSIDE|56=EXCH|34=2|52=20260924-10:00:05.000|11=ORD-1|21=1|55=DEMO|54=1|60=20260924-10:00:05.000|38=100|40=2|44=101.25|59=0|10=021|
+ACK         8=FIX.4.2|9=144|35=8|49=EXCH|56=BUYSIDE|34=2|52=20260924-10:00:05.001|37=EX-1|11=ORD-1|17=EXEC-1|20=0|150=0|39=0|55=DEMO|54=1|38=100|44=101.25|151=100|14=0|6=0|10=031|
+PARTIAL     8=FIX.4.2|9=165|35=8|49=EXCH|56=BUYSIDE|34=3|52=20260924-10:00:05.251|37=EX-1|11=ORD-1|17=EXEC-2|20=0|150=1|39=1|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=50|14=50|6=101.00|10=240|
+FILL        8=FIX.4.2|9=165|35=8|49=EXCH|56=BUYSIDE|34=4|52=20260924-10:00:05.501|37=EX-1|11=ORD-1|17=EXEC-3|20=0|150=2|39=2|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=0|14=100|6=101.00|10=233|
+```
+
+**FIX.4.3**
+
+```
+LOGON       8=FIX.4.3|9=72|35=A|49=BUYSIDE|56=EXCH|34=1|52=20260924-10:00:00.000|98=0|108=30|141=Y|10=082|
+LOGON_REPLY 8=FIX.4.3|9=72|35=A|49=EXCH|56=BUYSIDE|34=1|52=20260924-10:00:00.001|98=0|108=30|141=Y|10=083|
+ORDER       8=FIX.4.3|9=133|35=D|49=BUYSIDE|56=EXCH|34=2|52=20260924-10:00:05.000|11=ORD-1|21=1|55=DEMO|54=1|60=20260924-10:00:05.000|38=100|40=2|44=101.25|59=0|10=022|
+ACK         8=FIX.4.3|9=139|35=8|49=EXCH|56=BUYSIDE|34=2|52=20260924-10:00:05.001|37=EX-1|11=ORD-1|17=EXEC-1|150=0|39=0|55=DEMO|54=1|38=100|44=101.25|151=100|14=0|6=0|10=084|
+PARTIAL     8=FIX.4.3|9=160|35=8|49=EXCH|56=BUYSIDE|34=3|52=20260924-10:00:05.251|37=EX-1|11=ORD-1|17=EXEC-2|150=F|39=1|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=50|14=50|6=101.00|10=049|
+FILL        8=FIX.4.3|9=160|35=8|49=EXCH|56=BUYSIDE|34=4|52=20260924-10:00:05.501|37=EX-1|11=ORD-1|17=EXEC-3|150=F|39=2|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=0|14=100|6=101.00|10=041|
+```
+
+**FIX.4.4**
+
+```
+LOGON       8=FIX.4.4|9=72|35=A|49=BUYSIDE|56=EXCH|34=1|52=20260924-10:00:00.000|98=0|108=30|141=Y|10=083|
+LOGON_REPLY 8=FIX.4.4|9=72|35=A|49=EXCH|56=BUYSIDE|34=1|52=20260924-10:00:00.001|98=0|108=30|141=Y|10=084|
+ORDER       8=FIX.4.4|9=128|35=D|49=BUYSIDE|56=EXCH|34=2|52=20260924-10:00:05.000|11=ORD-1|55=DEMO|54=1|60=20260924-10:00:05.000|38=100|40=2|44=101.25|59=0|10=073|
+ACK         8=FIX.4.4|9=139|35=8|49=EXCH|56=BUYSIDE|34=2|52=20260924-10:00:05.001|37=EX-1|11=ORD-1|17=EXEC-1|150=0|39=0|55=DEMO|54=1|38=100|44=101.25|151=100|14=0|6=0|10=085|
+PARTIAL     8=FIX.4.4|9=160|35=8|49=EXCH|56=BUYSIDE|34=3|52=20260924-10:00:05.251|37=EX-1|11=ORD-1|17=EXEC-2|150=F|39=1|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=50|14=50|6=101.00|10=050|
+FILL        8=FIX.4.4|9=160|35=8|49=EXCH|56=BUYSIDE|34=4|52=20260924-10:00:05.501|37=EX-1|11=ORD-1|17=EXEC-3|150=F|39=2|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=0|14=100|6=101.00|10=042|
+```
+
+**FIX.5.0SP2**
+
+```
+LOGON       8=FIXT.1.1|9=79|35=A|49=BUYSIDE|56=EXCH|34=1|52=20260924-10:00:00.000|98=0|108=30|141=Y|1137=9|10=235|
+LOGON_REPLY 8=FIXT.1.1|9=79|35=A|49=EXCH|56=BUYSIDE|34=1|52=20260924-10:00:00.001|98=0|108=30|141=Y|1137=9|10=236|
+ORDER       8=FIXT.1.1|9=128|35=D|49=BUYSIDE|56=EXCH|34=2|52=20260924-10:00:05.000|11=ORD-1|55=DEMO|54=1|60=20260924-10:00:05.000|38=100|40=2|44=101.25|59=0|10=151|
+ACK         8=FIXT.1.1|9=139|35=8|49=EXCH|56=BUYSIDE|34=2|52=20260924-10:00:05.001|37=EX-1|11=ORD-1|17=EXEC-1|150=0|39=0|55=DEMO|54=1|38=100|44=101.25|151=100|14=0|6=0|10=163|
+PARTIAL     8=FIXT.1.1|9=160|35=8|49=EXCH|56=BUYSIDE|34=3|52=20260924-10:00:05.251|37=EX-1|11=ORD-1|17=EXEC-2|150=F|39=1|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=50|14=50|6=101.00|10=128|
+FILL        8=FIXT.1.1|9=160|35=8|49=EXCH|56=BUYSIDE|34=4|52=20260924-10:00:05.501|37=EX-1|11=ORD-1|17=EXEC-3|150=F|39=2|55=DEMO|54=1|38=100|44=101.25|32=50|31=101.00|151=0|14=100|6=101.00|10=120|
 ```
 
 ---
@@ -294,7 +350,7 @@ The FIX version is chosen at connect time: `WS /ws?fixVersion=FIX.4.4` (default 
 { "type": "hello", "sandboxId": "sbx_7f3a", "buyside": "BUYSIDE", "exchange": "EXCH",
   "heartBtIntSec": 10, "version": "0.1.0",
   "fixVersion": "FIX.4.4",                                   // version this sandbox runs
-  "fixVersions": [ { "id": "FIX.4.2", "label": "FIX 4.2", "status": "planned", "summary": "…" },
+  "fixVersions": [ { "id": "FIX.4.2", "label": "FIX 4.2", "status": "implemented", "summary": "…" },
                    { "id": "FIX.4.4", "label": "FIX 4.4", "status": "implemented", "summary": "…" } ] }
 
 // Session state change of either side

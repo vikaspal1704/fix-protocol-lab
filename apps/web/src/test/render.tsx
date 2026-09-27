@@ -4,10 +4,10 @@ import { Provider } from "react-redux";
 
 import { makeStore } from "../app/store";
 import { connect } from "../features/connection/actions";
-import type { FixMessageEvent, ServerEvent } from "../protocol";
+import type { FixMessageEvent, HelloEvent, ServerEvent } from "../protocol";
 import { FakeWebSocket } from "./fakeSocket";
 
-export const HELLO: ServerEvent = {
+export const HELLO: HelloEvent = {
   type: "hello",
   sandboxId: "sbx_test",
   buyside: "BUYSIDE",
@@ -16,7 +16,8 @@ export const HELLO: ServerEvent = {
   version: "0.1.0",
   fixVersion: "FIX.4.4",
   fixVersions: [
-    { id: "FIX.4.2", label: "FIX 4.2", status: "planned", summary: "Still common." },
+    { id: "FIX.4.1", label: "FIX 4.1", status: "planned", summary: "Test-only planned version." },
+    { id: "FIX.4.2", label: "FIX 4.2", status: "implemented", summary: "Fills use ExecType 1/2." },
     { id: "FIX.4.4", label: "FIX 4.4", status: "implemented", summary: "Most deployed." },
   ],
 };

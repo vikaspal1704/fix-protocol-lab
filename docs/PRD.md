@@ -10,7 +10,7 @@
 ## 1. Goals
 
 1. Deliver a **correct, from-scratch FIX codec and session engine** in TypeScript that proves an understanding of FIX beyond message format: sequencing, heartbeats, test requests and gap recovery.
-2. Be **the place to see FIX working live**, across FIX versions. v1 ships FIX 4.4 end to end. The design is **version-pluggable**, so FIX 4.2, 4.3 and 5.0 (over FIXT.1.1) can be added one at a time, each as a self-contained profile, without touching the engine.
+2. Be **the place to see FIX working live**, across FIX versions. v1 shipped FIX 4.4 end to end; M3 added FIX 4.2, 4.3 and 5.0 SP2 (over FIXT.1.1). The design is **version-pluggable**: each version is a self-contained profile, added without touching the engine.
 3. Make FIX **visible**: a live, sequence-diagram view of two counterparties exchanging real FIX over a real TCP session, with the ability to inject faults and watch recovery.
 4. Be the tool someone with **zero trading background** uses to understand FIX: plain-language README, an inline tag reference, and a session-layer write-up.
 5. Ship a **live public demo on a real domain**, with green CI and an MIT license.

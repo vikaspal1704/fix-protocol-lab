@@ -12,9 +12,9 @@
 |------|------------|
 | Codec | golden vectors, round trip, BodyLength/CheckSum rules and edge cases, malformed input |
 | Framer | split chunks, multiple messages per chunk, garbage resync, size limit |
-| Session | logon, heartbeats, TestRequest, timeout, gap → resend, GapFill vs PossDup resend, too-low logout, garbled drop, logout |
+| Session | logon, heartbeats, TestRequest, timeout, gap → resend, GapFill vs PossDup resend, too-low logout, garbled drop, logout; logon and gap recovery in every FIX version |
 | TCP adapter | real loopback sockets, initiator ↔ acceptor |
-| Exchange sim | ack, crossing and non-crossing, partial then full fill, cancel, cancel reject, unknown symbol |
+| Exchange sim | ack, crossing and non-crossing, partial then full fill, cancel, cancel reject, unknown symbol; the full flow byte for byte in every FIX version |
 | Bridge | event shapes, validation, rate limit, capacity, isolation, idle timeout |
 | Web | encoded preview, visualizer rows, tag panel, fault buttons |
 | E2E | real browser against the production build |
@@ -37,18 +37,24 @@
 | `preserves duplicate tags in order` | Repeating-group-like duplicates survive the round trip |
 | `encoder rejects SOH and non-ASCII in values` | → `MALFORMED_FIELD` |
 | `formats UTC timestamps with milliseconds` | `time.ts` round trip, `YYYYMMDD-HH:MM:SS.sss` |
-| `dictionary covers every tag used by the project` | Every tag in API_CONTRACT §2 has a `TagInfo`, and every msgType has a `MSG_TYPES` entry |
+| `dictionary covers every tag used by the project` | In every implemented version, every tag in API_CONTRACT §2 (plus 20/21 in 4.2, 21 in 4.3, 1128/1137 in 5.0 SP2) has a `TagInfo`, and every msgType has an entry |
 | `framer reassembles a message split across chunks` | Feed byte by byte → exactly one message |
 | `framer returns multiple messages from one chunk` | Concatenated A1+A3+A4 → three messages in order |
 | `framer resyncs after garbage bytes` | `xx…` + A1 → A1 emitted, garbage discarded |
 | `framer enforces max message size` | 9=70000 → `MESSAGE_TOO_LARGE` |
 | `runs without Node built-ins` | Guard test: `fix-core/src` imports no `node:*` and no `Buffer` |
-| `registry lists implemented and planned versions` | `listVersions()` includes FIX.4.4 `implemented`, and FIX.4.2, FIX.4.3, FIX.5.0SP2 `planned`, oldest first |
+| `registry lists every roadmap version as implemented` | `listVersions()` is FIX.4.2, FIX.4.3, FIX.4.4, FIX.5.0SP2 (BeginString `FIXT.1.1`, ApplVerID `9`), all `implemented`, oldest first |
 | `registry rejects duplicate version ids` | `registerVersion` twice → throws |
-| `decode rejects unregistered or planned begin strings` | `8=FIX.4.2` (planned) and `8=FOO.1` → `UNKNOWN_VERSION` |
+| `decode rejects unregistered or planned begin strings` | A test-registered planned profile `FIX.9.7` and `8=FOO.1` → `UNKNOWN_VERSION` |
 | `supports a newly registered test version` | Register a fake implemented profile `FIX.9.9` in the test → encode/decode round trip works with no codec change |
 | `dictionary overrides compose over a base` | `defineDictionary(base, {tags, removeTags})` adds, overrides and removes as specified |
-| `no hard-coded begin string outside version profiles` | Guard test: `"FIX.4.4"` appears in source only under `versions/fix44/` (and in tests/vectors) |
+| `no hard-coded begin string outside version profiles` | Guard test: no `"FIX.x"` / `"FIXT.x"` string literal in `fix-core/src` outside `versions/<id>/` |
+| `codec round-trips FIX.4.2 golden vectors` | Every §1.4 vector for FIX.4.2 decodes to its fields and re-encodes byte for byte |
+| `codec round-trips FIX.4.3 golden vectors` | Every §1.4 vector for FIX.4.3 decodes to its fields and re-encodes byte for byte |
+| `codec round-trips FIX.4.4 golden vectors` | Every §1.4 vector for FIX.4.4 decodes to its fields and re-encodes byte for byte |
+| `codec round-trips FIX.5.0SP2 golden vectors` | Every §1.4 vector for FIX.5.0SP2 decodes to its fields and re-encodes byte for byte |
+| `docs show only valid fix messages and the per-version vectors` | Every complete `8=…|10=…|` message in README and `docs/` decodes (valid 9/10), and API_CONTRACT §1.4 lists every per-version vector |
+| `version dictionaries describe what changed between versions` | 4.2: ExecType 1/2, no F, tag 32 = LastShares; 4.3: no tag 20; 4.4: no tag 21; 5.0 SP2: 1137 value 9 = FIX 5.0 SP2 |
 
 Coverage gate: ≥ 90% lines for `fix-core`.
 
@@ -85,6 +91,11 @@ Unit tests drive two `FixSession`s through an in-memory `ByteTransport` pipe wit
 | `logs out on incorrect begin string` | Inbound message with another BeginString → Logout `Incorrect BeginString`, DISCONNECTED |
 | `queues new outbound messages during resend replay` | A message sent mid-replay goes out after the replay with the next seq |
 | `worked example A produces golden vectors A1 to A4` | With the fake clock at the example times, the `wire` raw bytes equal the vectors |
+| `session logs on and recovers a gap in FIX.4.2` | Logon both ways equals the §1.4 FIX.4.2 LOGON/LOGON_REPLY vectors; a dropped order is recovered via ResendRequest and PossDup replay; every message carries that version's BeginString |
+| `session logs on and recovers a gap in FIX.4.3` | Logon both ways equals the §1.4 FIX.4.3 LOGON/LOGON_REPLY vectors; a dropped order is recovered via ResendRequest and PossDup replay; every message carries that version's BeginString |
+| `session logs on and recovers a gap in FIX.4.4` | Logon both ways equals the §1.4 FIX.4.4 LOGON/LOGON_REPLY vectors; a dropped order is recovered via ResendRequest and PossDup replay; every message carries that version's BeginString |
+| `session logs on and recovers a gap in FIX.5.0SP2` | Logon both ways equals the §1.4 FIX.5.0SP2 LOGON/LOGON_REPLY vectors; a dropped order is recovered via ResendRequest and PossDup replay; every message carries that version's BeginString |
+| `fixt acceptor rejects logon without DefaultApplVerID` | FIX.5.0SP2 acceptor, Logon without 1137 → Reject 373=1 371=1137, Logout, DISCONNECTED |
 
 TCP integration (`transport.test.ts`, real sockets):
 
@@ -108,12 +119,19 @@ TCP integration (`transport.test.ts`, real sockets):
 | `exchange rejects cancel of filled order as too late` | 9 with 102=0 |
 | `exchange rejects cancel of unknown order` | 9 with 102=1 |
 | `exchange rejects unknown symbol` | 8 150=8 39=8 58=Unknown symbol |
+| `exchange flow in FIX.4.2 produces valid execution reports` | Session pair + exchange in FIX.4.2: the wire equals the §1.4 FIX.4.2 vectors (logon, order, ack, partial, fill) and the dialect parses NEW → PARTIALLY_FILLED → FILLED |
+| `exchange flow in FIX.4.3 produces valid execution reports` | Session pair + exchange in FIX.4.3: the wire equals the §1.4 FIX.4.3 vectors (logon, order, ack, partial, fill) and the dialect parses NEW → PARTIALLY_FILLED → FILLED |
+| `exchange flow in FIX.4.4 produces valid execution reports` | Session pair + exchange in FIX.4.4: the wire equals the §1.4 FIX.4.4 vectors (logon, order, ack, partial, fill) and the dialect parses NEW → PARTIALLY_FILLED → FILLED |
+| `exchange flow in FIX.5.0SP2 produces valid execution reports` | Session pair + exchange in FIX.5.0SP2: the wire equals the §1.4 FIX.5.0SP2 vectors (logon, order, ack, partial, fill) and the dialect parses NEW → PARTIALLY_FILLED → FILLED |
 | `bridge sends hello and session state on connect` | `hello`, then both sides reach `ACTIVE` via `session.state` |
 | `bridge emits out and in events for each message` | One D produces a `fix.message` `out` from BUYSIDE and an `in` at EXCH with the same seq |
 | `bridge emits order updates from execution reports` | `order.update` NEW → PARTIALLY_FILLED → FILLED |
 | `bridge validates client commands` | Bad qty/price/type → `error` BAD_REQUEST, connection stays open |
 | `bridge rate limits order commands` | 6 `order.new` within 1 s → one `RATE_LIMITED` |
 | `bridge enforces sandbox capacity` | MAX_SANDBOXES=1, second client → `CAPACITY` and close 1013 |
+| `bridge trades over a FIX.4.2 session` | `/ws?fixVersion=FIX.4.2`: every `fix.message` starts `8=FIX.4.2` and is tagged FIX.4.2; order reaches FILLED |
+| `bridge trades over a FIX.4.3 session` | `/ws?fixVersion=FIX.4.3`: every `fix.message` starts `8=FIX.4.3` and is tagged FIX.4.3; order reaches FILLED |
+| `bridge trades over a FIX.5.0SP2 session` | `/ws?fixVersion=FIX.5.0SP2`: every `fix.message` starts `8=FIXT.1.1` and is tagged FIX.5.0SP2; order reaches FILLED |
 | `sandboxes are isolated` | Two clients; A's order never appears in B's stream |
 | `sandbox closes after idle timeout` | Fake time > SANDBOX_IDLE_TIMEOUT_SEC → close 1000, sockets freed |
 | `gap recovery scenario over websocket` | `fault.inject drop_next` then `order.new` → the stream contains ResendRequest, GapFill and a PossDup resend; both sides ACTIVE |
@@ -121,8 +139,13 @@ TCP integration (`transport.test.ts`, real sockets):
 | `instruments endpoint lists symbols` | `GET /api/instruments` |
 | `serves built ui with spa fallback` | `GET /some/route` → index.html |
 | `versions endpoint lists registry` | `GET /api/versions` mirrors `listVersions()` |
-| `bridge rejects unsupported fix version` | `/ws?fixVersion=FIX.4.2` (planned) → `error` UNSUPPORTED_VERSION, close 1008 |
+| `bridge rejects unsupported fix version` | `/ws?fixVersion=FIX.4.1` (not registered) → `error` UNSUPPORTED_VERSION, close 1008 |
 | `fix44 dialect builds execution reports per spec` | New/fill/cancel/reject events → fields per API_CONTRACT §2 |
+| `every implemented version has a dialect` | `hasDialect` for all four; unknown version → throws |
+| `fix42 dialect uses ExecTransType and ExecType 1/2 for fills` | Partial fill `20=0 150=1 39=1`, full fill `150=2 39=2`; D carries `21=1` |
+| `fix43 dialect drops ExecTransType but keeps HandlInst` | No tag 20, fill `150=F`; D tags `11 21 55 54 60 38 40 44 59` |
+| `fix50sp2 dialect sends the FIX 4.4 order shapes` | Same D and 8 fields as FIX 4.4, no HandlInst |
+| `every dialect parses its own execution reports for the blotter` | `parseOrderUpdate` / `parseNewOrder` round-trip in every version |
 
 ## 5. Web (apps/web, Vitest + Testing Library)
 
@@ -137,7 +160,8 @@ TCP integration (`transport.test.ts`, real sockets):
 | `clicking a tag opens its dictionary entry` | Click `54` → "Side", values 1=Buy, 2=Sell |
 | `fault buttons send fault inject commands` | Click → `fault.inject` sent over the mocked socket |
 | `reconnects with backoff after socket close` | Mock close → status "reconnecting", retry scheduled |
-| `version picker lists implemented and planned versions` | Planned versions visible, disabled, labelled "planned" |
+| `version picker lists implemented and planned versions` | Implemented versions enabled; planned ones visible, disabled, labelled "planned"; the selected version's summary is shown |
+| `switching version reconnects and encodes orders for that version` | Click FIX 4.2 → reconnect to `?fixVersion=FIX.4.2`; preview starts `8=FIX.4.2` and contains `21=1` |
 | `visualizer shows the fix version of each message` | Row or inspector shows `FIX.4.4` |
 
 ## 6. End-to-end (apps/web/e2e, Playwright)

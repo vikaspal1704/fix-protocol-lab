@@ -1,10 +1,11 @@
 import { encode, formatUtcTimestamp, toDisplay, type FixField, type FixMessage } from "@fixlab/fix-core";
-import { ManualClock } from "@fixlab/fix-session";
+import { createPipe, FixSession, ManualClock } from "@fixlab/fix-session";
 import { describe, expect, it } from "vitest";
 
 import { INSTRUMENTS } from "../src/config.js";
 import { dialectFor } from "@fixlab/fix-orders";
 import { ExchangeSimulator, formatPx } from "../src/exchange.js";
+import { VERSION_VECTORS } from "../../../packages/fix-core/test/vectors.js";
 
 const T0 = Date.UTC(2026, 8, 24, 10, 0, 5, 0);
 const dialect = dialectFor("FIX.4.4");
@@ -142,3 +143,33 @@ describe("exchange simulator", () => {
   });
 });
 
+describe("exchange in every fix version", () => {
+  for (const [version, vectors] of Object.entries(VERSION_VECTORS)) {
+    it(`exchange flow in ${version} produces valid execution reports`, () => {
+      const clock = new ManualClock(Date.UTC(2026, 8, 24, 10, 0, 0, 0));
+      const [a, b] = createPipe(clock, 1);
+      const base = { version, heartBtIntSec: 30, clock };
+      const buy = new FixSession({ ...base, role: "initiator", senderCompId: "BUYSIDE", targetCompId: "EXCH" });
+      const exch = new FixSession({ ...base, role: "acceptor", senderCompId: "EXCH", targetCompId: "BUYSIDE" });
+      const sent = { buy: [] as string[], exch: [] as string[] };
+      buy.on("wire", (w) => w.direction === "out" && sent.buy.push(toDisplay(w.raw)));
+      exch.on("wire", (w) => w.direction === "out" && sent.exch.push(toDisplay(w.raw)));
+      const versionDialect = dialectFor(version);
+      const exchange = new ExchangeSimulator({ clock, dialect: versionDialect, instruments: INSTRUMENTS, send: (t, f) => exch.send(t, f) });
+      exch.on("app", (m) => exchange.onAppMessage(m));
+      const updates: string[] = [];
+      buy.on("app", (m) => updates.push(versionDialect.parseOrderUpdate(m).status ?? "?"));
+      buy.attach(a);
+      exch.attach(b);
+
+      buy.logon();
+      clock.advanceTo(clock.now() + 5000);
+      buy.send("D", versionDialect.newOrderSingle({ clOrdId: "ORD-1", symbol: "DEMO", side: "BUY", qty: 100, ordType: "LIMIT", price: "101.25", transactTime: formatUtcTimestamp(clock.now()) }));
+      clock.advance(600);
+
+      expect(sent.buy).toEqual([vectors.LOGON, vectors.ORDER]);
+      expect(sent.exch).toEqual([vectors.LOGON_REPLY, vectors.ACK, vectors.PARTIAL, vectors.FILL]);
+      expect(updates).toEqual(["NEW", "PARTIALLY_FILLED", "FILLED"]);
+    });
+  }
+});

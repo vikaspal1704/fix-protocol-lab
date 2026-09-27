@@ -65,7 +65,7 @@ describe("websocket bridge", () => {
 
     const hello = client.messages[0]!;
     expect(hello).toMatchObject({ type: "hello", buyside: "BUYSIDE", exchange: "EXCH", fixVersion: "FIX.4.4", heartBtIntSec: 30 });
-    expect((hello.fixVersions as { id: string; status: string }[]).map((v) => `${v.id}:${v.status}`)).toContain("FIX.4.2:planned");
+    expect((hello.fixVersions as { id: string; status: string }[]).map((v) => `${v.id}:${v.status}`)).toEqual(["FIX.4.2:implemented", "FIX.4.3:implemented", "FIX.4.4:implemented", "FIX.5.0SP2:implemented"]);
     expect(client.of("session.state").map((s) => `${s.side}:${s.state}`)).toEqual(
       expect.arrayContaining(["BUYSIDE:ACTIVE", "EXCH:ACTIVE"]),
     );
@@ -145,12 +145,28 @@ describe("websocket bridge", () => {
   it("bridge rejects unsupported fix version", async () => {
     await start();
 
-    const client = await connect("?fixVersion=FIX.4.2");
+    const client = await connect("?fixVersion=FIX.4.1");
     await client.until((c) => c.closeCode !== null);
 
     expect(client.of("error")[0]).toMatchObject({ code: "UNSUPPORTED_VERSION" });
     expect(client.closeCode).toBe(1008);
   });
+
+  for (const [version, beginString] of [["FIX.4.2", "FIX.4.2"], ["FIX.4.3", "FIX.4.3"], ["FIX.5.0SP2", "FIXT.1.1"]]) {
+    it(`bridge trades over a ${version} session`, async () => {
+      await start();
+      const client = await connect(`?fixVersion=${version}`);
+      await active(client);
+
+      client.send(newOrder);
+      await client.until((c) => c.of("order.update").some((o) => o.status === "FILLED"));
+
+      expect(client.messages[0]).toMatchObject({ type: "hello", fixVersion: version });
+      const fix = client.of("fix.message");
+      expect(fix.every((m) => String(m.raw).startsWith(`8=${beginString}|`) && m.fixVersion === version)).toBe(true);
+      expect(client.of("order.update").map((o) => o.status)).toEqual(["PENDING_NEW", "NEW", "PARTIALLY_FILLED", "FILLED"]);
+    });
+  }
 
   it("sandboxes are isolated", async () => {
     await start();
@@ -232,7 +248,7 @@ describe("http", () => {
 
     const body = (await (await fetch(`http://127.0.0.1:${app!.port}/api/versions`)).json()) as { id: string; status: string }[];
 
-    expect(body.map((v) => `${v.id}:${v.status}`)).toEqual(["FIX.4.2:planned", "FIX.4.3:planned", "FIX.4.4:implemented", "FIX.5.0SP2:planned"]);
+    expect(body.map((v) => `${v.id}:${v.status}`)).toEqual(["FIX.4.2:implemented", "FIX.4.3:implemented", "FIX.4.4:implemented", "FIX.5.0SP2:implemented"]);
   });
 
   it("serves built ui with spa fallback", async () => {

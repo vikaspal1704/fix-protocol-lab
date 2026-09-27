@@ -36,7 +36,7 @@ Ship each phase green before starting the next. **Milestone M1 = Phases 1–2.**
 
 ### Phase 1 — `fix-core` (codec + version registry)
 
-- Version registry first (ARCHITECTURE §12): `FixVersionProfile`, `registerVersion`, `getVersion`, `listVersions`, `versionForBeginString`. Register FIX 4.4 as `implemented`, and 4.2, 4.3 and 5.0 SP2 as `planned` (metadata only).
+- Version registry first (ARCHITECTURE §12): `FixVersionProfile`, `registerVersion`, `getVersion`, `listVersions`, `versionForBeginString`. Register FIX 4.4 as `implemented`, and 4.2, 4.3 and 5.0 SP2 as `planned` (metadata only). (Done: M3 has since implemented all four; see ARCHITECTURE §12.)
 
 - Scaffold npm workspaces, `tsconfig.base.json` (strict), ESLint/Prettier, Vitest, CI skeleton.
 - `encode`, `decode`, `computeCheckSum`, `toDisplay`/`fromDisplay`, field helpers, `FixParseError`.

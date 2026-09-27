@@ -48,10 +48,10 @@ fix-protocol-lab/
 │   │   │   ├── dictionary.ts    # FixDictionary type + defineDictionary(base, overrides)
 │   │   │   └── versions/
 │   │   │       ├── registry.ts  # registerVersion / getVersion / listVersions
-│   │   │       ├── fix44/       # profile.ts, dictionary.ts (implemented)
-│   │   │       └── planned.ts   # FIX.4.2, FIX.4.3, FIX.5.0SP2 metadata (status: planned)
+│   │   │       ├── fix42/ fix43/ fix44/ fix50sp2/   # profile.ts + dictionary.ts per implemented version
+│   │   │       └── planned.ts   # roadmap versions not yet implemented (status: planned)
 │   │   └── test/
-│   ├── fix-orders/          # per-version OrderDialect (fix44.ts, …); isomorphic, shared by server + web
+│   ├── fix-orders/          # createDialect() + one OrderDialect per version (fix42.ts … fix50sp2.ts); isomorphic, shared by server + web
 │   │   └── src/
 │   └── fix-session/
 │       ├── src/
